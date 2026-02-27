@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Service</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:system-ui,sans-serif;padding:10px;background:#667eea;min-height:100vh}
+        h1{color:#fff;text-align:center;margin:10px 0;font-size:1.4em}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;max-width:1400px;margin:0 auto}
+        .card{background:#fff;border-radius:8px;padding:12px;box-shadow:0 4px 15px rgba(0,0,0,.2)}
+        .card h2{font-size:1em;color:#333;border-bottom:2px solid #667eea;padding-bottom:6px;margin-bottom:10px}
+        .form-group{margin-bottom:8px}
+        label{display:block;margin-bottom:3px;font-weight:600;color:#555;font-size:.85em}
+        input,textarea,select{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:.9em}
+        input:focus,textarea:focus,select:focus{border-color:#667eea;outline:none}
+        textarea{resize:vertical}
+        button{width:100%;padding:10px;background:#667eea;color:#fff;border:none;border-radius:4px;font-size:.9em;font-weight:600;cursor:pointer}
+        button:hover{background:#5a6fd6}
+        .btn-danger{background:#e03131}
+        .btn-danger:hover{background:#c92a2a}
+        .btn-success{background:#40c057}
+        .btn-success:hover{background:#37b24d}
+        .tabs{display:flex;gap:5px;margin-bottom:10px}
+        .tab{padding:5px 12px;border:1px solid #667eea;border-radius:15px;background:transparent;color:#667eea;font-size:.8em;width:auto}
+        .tab.active{background:#667eea;color:#fff}
+        .hidden{display:none}
+        .response{background:#1e1e1e;border-radius:4px;padding:10px;max-height:200px;overflow-y:auto}
+        .response pre{color:#4ec9b0;margin:0;white-space:pre-wrap;word-wrap:break-word;font-family:monospace;font-size:.8em}
+        .status-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+        .status{padding:3px 10px;border-radius:10px;font-size:.7em;font-weight:600}
+        .status-success{background:#d3f9d8;color:#2f9e44}
+        .status-error{background:#ffe3e3;color:#e03131}
+        .status-pending{background:#fff3bf;color:#f59f00}
+        .token-display{background:#f8f9fa;padding:8px;border-radius:4px;font-size:.75em;word-break:break-all;margin-top:8px}
+        .events-list{max-height:150px;overflow-y:auto;margin-top:10px}
+        .event-item{background:#f8f9fa;padding:8px;border-radius:4px;margin-bottom:6px;border-left:3px solid #667eea;font-size:.85em}
+        .event-item h4{margin:0 0 4px;font-size:.9em}
+        .event-item p{margin:2px 0;color:#666;font-size:.8em}
+        .event-id{font-size:.7em;color:#999;font-family:monospace}
+        .info-box{background:#e7f5ff;border:1px solid #74c0fc;border-radius:4px;padding:8px;margin-bottom:8px;font-size:.8em;color:#1971c2}
+        .success-msg{background:#d3f9d8;border:1px solid #40c057;color:#2f9e44;padding:8px;border-radius:4px;margin-top:8px;font-size:.85em}
+        .row{display:flex;gap:8px}
+        .row>*{flex:1}
+        .response-panel{grid-column:1/-1}
+    </style>
+</head>
+<body>
+    <h1>🗓️ Calendar Service</h1>
+    <div class="grid">
+        <!-- Auth Section -->
+        <div class="card">
+            <h2>🔐 Авторизация</h2>
+            <div class="tabs">
+                <button class="tab active" onclick="showAuthTab('login')">Вход</button>
+                <button class="tab" onclick="showAuthTab('register')">Регистрация</button>
+            </div>
+            <div id="loginTab">
+                <div class="form-group">
+                    <label>Логин</label>
+                    <input type="text" id="loginUsername" placeholder="Введите логин">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="loginPassword" placeholder="Введите пароль">
+                </div>
+                <button onclick="login()">Войти</button>
+            </div>
+            <div id="registerTab" class="hidden">
+                <div class="form-group">
+                    <label>Логин</label>
+                    <input type="text" id="registerLogin" placeholder="3-20 символов">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="example@mail.com">
+                </div>
+                <div class="form-group">
+                    <label>Telegram Chat ID</label>
+                    <input type="text" id="registerTelegram" placeholder="123456789">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="registerPassword" placeholder="Мин. 8 символов">
+                </div>
+                <button class="btn-success" onclick="register()">Зарегистрироваться</button>
+            </div>
+            <div id="tokenDisplay" class="token-display hidden">
+                <strong>Token:</strong> <span id="accessTokenText"></span>
+            </div>
+        </div>
+
+        <!-- Create Event -->
+        <div class="card">
+            <h2>➕ Создать событие</h2>
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" id="eventName" placeholder="Встреча с командой">
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Дата события</label>
+                    <input type="date" id="eventDate">
+                </div>
+                <div class="form-group">
+                    <label>Напоминание</label>
+                    <input type="datetime-local" id="reminderDate">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea id="eventDescription" rows="2" placeholder="Описание..."></textarea>
+            </div>
+            <button class="btn-success" onclick="handleCreateEvent()">Создать</button>
+            <div id="createResult" class="hidden success-msg"></div>
+        </div>
+
+        <!-- Get Events -->
+        <div class="card">
+            <h2>📅 Получить события</h2>
+            <div class="row">
+                <div class="form-group">
+                    <label>Дата</label>
+                    <input type="date" id="getEventsDate">
+                </div>
+                <div class="form-group">
+                    <label>Период</label>
+                    <select id="getEventsRange">
+                        <option value="day">День</option>
+                        <option value="week">Неделя</option>
+                        <option value="month">Месяц</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="getEvents()">Получить</button>
+            <div id="eventsList" class="events-list"></div>
+        </div>
+
+        <!-- Update Event -->
+        <div class="card">
+            <h2>✏️ Обновить событие</h2>
+            <div class="form-group">
+                <label>ID события</label>
+                <input type="text" id="updateEventId" placeholder="UUID события">
+            </div>
+            <div class="form-group">
+                <label>Новое название</label>
+                <input type="text" id="updateEventName" placeholder="Название">
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Новая дата</label>
+                    <input type="date" id="updateEventDate">
+                </div>
+                <div class="form-group">
+                    <label>Напоминание</label>
+                    <input type="datetime-local" id="updateReminderDate">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Новое описание</label>
+                <textarea id="updateEventDescription" rows="2" placeholder="Описание..."></textarea>
+            </div>
+            <button onclick="updateEvent()">Обновить</button>
+        </div>
+
+        <!-- Delete Event -->
+        <div class="card">
+            <h2>🗑️ Удалить событие</h2>
+            <div class="form-group">
+                <label>ID события</label>
+                <input type="text" id="deleteEventId" placeholder="UUID события">
+            </div>
+            <button class="btn-danger" onclick="deleteEvent()">Удалить</button>
+        </div>
+
+        <!-- Refresh Token -->
+        <div class="card">
+            <h2>🔄 Обновить токен</h2>
+            <div class="info-box">Refresh token для обновления сессии.</div>
+            <div class="form-group">
+                <label>Refresh Token</label>
+                <textarea id="refreshTokenInput" rows="2" placeholder="Вставьте refresh token"></textarea>
+            </div>
+            <button onclick="refreshToken()">Обновить токены</button>
+        </div>
+
+        <!-- Response Panel -->
+        <div class="card response-panel">
+            <div class="status-bar">
+                <h2 style="border:none;padding:0;margin:0">📤 Ответ сервера</h2>
+                <span id="statusBadge" class="status status-pending">Ожидание</span>
+            </div>
+            <div class="response">
+                <pre id="responseOutput">Ответ сервера...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api/v1';
+        let accessToken = '';
+        let refreshTokenValue = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const datetimeLocal = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + 'T' +
+                String(now.getHours()).padStart(2, '0') + ':' +
+                String(now.getMinutes()).padStart(2, '0');
+
+            document.getElementById('eventDate').value = today;
+            document.getElementById('reminderDate').value = datetimeLocal;
+            document.getElementById('getEventsDate').value = today;
+            document.getElementById('updateEventDate').value = today;
+            document.getElementById('updateReminderDate').value = datetimeLocal;
+        });
+
+        function showAuthTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('loginTab').classList.add('hidden');
+            document.getElementById('registerTab').classList.add('hidden');
+            if (tab === 'login') {
+                document.getElementById('loginTab').classList.remove('hidden');
+                document.querySelectorAll('.tab')[0].classList.add('active');
+            } else {
+                document.getElementById('registerTab').classList.remove('hidden');
+                document.querySelectorAll('.tab')[1].classList.add('active');
+            }
+        }
+
+        function setStatus(success) {
+            const badge = document.getElementById('statusBadge');
+            badge.textContent = success ? 'Успешно' : 'Ошибка';
+            badge.className = 'status ' + (success ? 'status-success' : 'status-error');
+        }
+
+        function showResponse(data, success = true) {
+            document.getElementById('responseOutput').textContent = JSON.stringify(data, null, 2);
+            setStatus(success);
+        }
+
+        async function apiRequest(endpoint, method, body, auth = true) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (auth && accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                showResponse(data, response.ok);
+                return { ok: response.ok, data };
+            } catch (error) {
+                showResponse({ error: error.message }, false);
+                return { ok: false, data: null };
+            }
+        }
+
+        async function login() {
+            const login = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const result = await apiRequest('/auth/login', 'POST', { login, password }, false);
+            if (result.ok && result.data) {
+                accessToken = result.data.access_token;
+                refreshTokenValue = result.data.refresh_token;
+                document.getElementById('tokenDisplay').classList.remove('hidden');
+                document.getElementById('accessTokenText').textContent = accessToken.substring(0, 30) + '...';
+                document.getElementById('refreshTokenInput').value = refreshTokenValue;
+            }
+        }
+
+        async function register() {
+            const login = document.getElementById('registerLogin').value;
+            const email = document.getElementById('registerEmail').value;
+            const telegram_chat_id = document.getElementById('registerTelegram').value;
+            const password = document.getElementById('registerPassword').value;
+            await apiRequest('/auth/register', 'POST', { login, email, telegram_chat_id, password }, false);
+        }
+
+        async function handleCreateEvent() {
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.classList.add('hidden');
+
+            if (!accessToken) {
+                resultDiv.innerHTML = `❌ Необходимо авторизоваться`;
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.background = '#ffe3e3';
+                resultDiv.style.color = '#e03131';
+                showResponse({ error: 'Необходимо авторизоваться' }, false);
+                return;
+            }
+
+            const event_name = document.getElementById('eventName').value;
+            const date = document.getElementById('eventDate').value;
+            const reminder_time = document.getElementById('reminderDate').value;
+            const event_text = document.getElementById('eventDescription').value;
+
+            const result = await apiRequest('/event/create_event', 'POST', { event_name, date, reminder_time, event: event_text });
+
+            if (result.ok && result.data) {
+                resultDiv.innerHTML = `✅ Событие создано! <br><strong>ID:</strong> <code>${result.data.event_id}</code>`;
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.background = '#d3f9d8';
+                resultDiv.style.color = '#2f9e44';
+                document.getElementById('updateEventId').value = result.data.event_id;
+                document.getElementById('deleteEventId').value = result.data.event_id;
+            } else {
+                resultDiv.innerHTML = `❌ Ошибка: ${result.data?.error || 'Неизвестная ошибка'}`;
+                resultDiv.classList.remove('hidden');
+                resultDiv.style.background = '#ffe3e3';
+                resultDiv.style.color = '#e03131';
+            }
+        }
+
+        async function getEvents() {
+            const date = document.getElementById('getEventsDate').value;
+            const range = document.getElementById('getEventsRange').value;
+            let endpoint = '';
+            switch (range) {
+                case 'day': endpoint = `/event/events_for_day?date=${date}`; break;
+                case 'week': endpoint = `/event/events_for_week?date=${date}`; break;
+                case 'month': endpoint = `/event/events_for_month?date=${date}`; break;
+            }
+            const result = await apiRequest(endpoint, 'GET');
+            if (result.ok && Array.isArray(result.data)) renderEventsList(result.data);
+        }
+
+        function renderEventsList(events) {
+            const container = document.getElementById('eventsList');
+            if (events.length === 0) {
+                container.innerHTML = '<p style="color:#666;text-align:center;font-size:.8em">Нет событий</p>';
+                return;
+            }
+            container.innerHTML = events.map(e => `
+                <div class="event-item">
+                    <h4>${e.event_name || 'Без названия'}</h4>
+                    <p>📅 ${e.date ? new Date(e.date).toLocaleDateString('ru-RU') : '-'}</p>
+                    <p>📝 ${e.event_text || '-'}</p>
+                    <p>⏰ ${e.reminder ? new Date(e.reminder).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-'}</p>
+                    <p class="event-id">ID: ${e.event_id}</p>
+                </div>
+            `).join('');
+        }
+
+        async function updateEvent() {
+            const event_id = document.getElementById('updateEventId').value;
+            const event_name = document.getElementById('updateEventName').value;
+            const date = document.getElementById('updateEventDate').value;
+            const reminder_time = document.getElementById('updateReminderDate').value;
+            const event = document.getElementById('updateEventDescription').value;
+            await apiRequest('/event/update_event', 'PUT', { event_id, event_name, date, reminder_time, event });
+        }
+
+        async function deleteEvent() {
+            const event_id = document.getElementById('deleteEventId').value;
+            await apiRequest('/event/delete_event', 'DELETE', { event_id });
+        }
+
+        async function refreshToken() {
+            const refresh_token = document.getElementById('refreshTokenInput').value;
+            const result = await apiRequest('/auth/refresh-token', 'POST', { refresh_token }, false);
+            if (result.ok && result.data) {
+                accessToken = result.data.access_token;
+                refreshTokenValue = result.data.refresh_token;
+                document.getElementById('tokenDisplay').classList.remove('hidden');
+                document.getElementById('accessTokenText').textContent = accessToken.substring(0, 30) + '...';
+                document.getElementById('refreshTokenInput').value = refreshTokenValue;
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,544 @@
+basePath: /
+definitions:
+  dto.AuthTokens:
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+    type: object
+  dto.EventRequestCreate:
+    properties:
+      date:
+        example: "2026-03-01"
+        type: string
+      event:
+        example: Обсуждение планов на квартал
+        type: string
+      event_name:
+        example: Встреча с командой
+        type: string
+      reminder_time:
+        example: 2026-03-01T09:00
+        type: string
+    required:
+    - date
+    - event_name
+    type: object
+  dto.EventRequestDelete:
+    properties:
+      event_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - event_id
+    type: object
+  dto.EventRequestUpdate:
+    properties:
+      date:
+        example: "2026-03-01"
+        type: string
+      event:
+        example: Обсуждение планов на квартал
+        type: string
+      event_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      event_name:
+        example: Встреча с командой
+        type: string
+      reminder_time:
+        example: 2026-03-01T09:00
+        type: string
+    required:
+    - date
+    - event_id
+    - event_name
+    type: object
+  dto.LoginRequest:
+    properties:
+      login:
+        example: john_doe
+        type: string
+      password:
+        example: securePassword123
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  dto.RegisterRequest:
+    properties:
+      email:
+        example: john@example.com
+        type: string
+      login:
+        example: john_doe
+        type: string
+      password:
+        example: securePassword123
+        type: string
+      telegram_chat_id:
+        example: "123456789"
+        type: string
+    required:
+    - email
+    - login
+    - password
+    type: object
+  dto.RegisterResponse:
+    properties:
+      email:
+        example: john@example.com
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      login:
+        example: john_doe
+        type: string
+      telegram_chat_id:
+        example: "123456789"
+        type: string
+    type: object
+  dto.TokenRefreshRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+    required:
+    - refresh_token
+    type: object
+  event.Event:
+    properties:
+      date:
+        type: string
+      event_id:
+        type: string
+      event_name:
+        type: string
+      event_text:
+        type: string
+      reminder:
+        type: string
+      reminder_sent:
+        type: boolean
+      status:
+        $ref: '#/definitions/event.Status'
+      user_id:
+        type: string
+    type: object
+  event.Status:
+    enum:
+    - active
+    - archive
+    type: string
+    x-enum-varnames:
+    - StatusActive
+    - StatusArchive
+info:
+  contact: {}
+  description: API для управления календарем событий.
+  termsOfService: http://swagger.io/terms/
+  title: Calendar API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Выполняет вход пользователя и возвращает JWT токены
+      parameters:
+      - description: Логин и пароль
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuthTokens'
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация пользователя
+      tags:
+      - auth
+  /api/v1/auth/refresh-token:
+    post:
+      consumes:
+      - application/json
+      description: Обновляет пару access/refresh токенов по refresh токену
+      parameters:
+      - description: Refresh токен
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TokenRefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AuthTokens'
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновление токенов
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Регистрирует нового пользователя с указанными данными
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RegisterResponse'
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация нового пользователя
+      tags:
+      - auth
+  /api/v1/event/create_event:
+    post:
+      consumes:
+      - application/json
+      description: Создает новое событие для авторизованного пользователя
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Данные события
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.EventRequestCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/event.Event'
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создание события
+      tags:
+      - event
+  /api/v1/event/delete_event:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет событие авторизованного пользователя
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID события для удаления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.EventRequestDelete'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Событие удалено
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удаление события
+      tags:
+      - event
+  /api/v1/event/events_for_day:
+    get:
+      description: Возвращает список событий пользователя за указанный день
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Дата в формате YYYY-MM-DD
+        example: '"2026-02-27"'
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/event.Event'
+            type: array
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение событий за день
+      tags:
+      - event
+  /api/v1/event/events_for_month:
+    get:
+      description: Возвращает список событий пользователя за месяц начиная с указанной
+        даты
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Начало месяца в формате YYYY-MM-DD
+        example: '"2026-02-01"'
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/event.Event'
+            type: array
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение событий за месяц
+      tags:
+      - event
+  /api/v1/event/events_for_week:
+    get:
+      description: Возвращает список событий пользователя за неделю начиная с указанной
+        даты
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Начало недели в формате YYYY-MM-DD
+        example: '"2026-02-23"'
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/event.Event'
+            type: array
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение событий за неделю
+      tags:
+      - event
+  /api/v1/event/update_event:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет существующее событие авторизованного пользователя
+      parameters:
+      - default: Bearer <token>
+        description: Bearer токен
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Данные для обновления события
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.EventRequestUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/event.Event'
+        "400":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Сообщение об ошибке
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновление события
+      tags:
+      - event
+swagger: "2.0"

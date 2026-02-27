@@ -1,0 +1,54 @@
+server:
+  host: "localhost"
+  port: 8080
+
+logger:
+  mode: "dev" # "dev" or "prod"
+  level: "debug" # "debug", "info", "warn", "error"
+  buffer_size: 1000 # размер буфера для асинхронного логгера
+
+gin:
+  mode: "release"
+
+db:
+  postgres:
+    host: "localhost"
+    port: 5433
+    ssl_mode: "disable"
+    max_open_conns: 5
+    max_idle_conns: 10
+    conn_max_lifetime: "100s"
+    read_timeout: 3s
+    write_timeout: 5s
+    long_timeout: 30s
+
+mail:
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+
+jwt:
+  exp_access_token: 15 # минуты
+  exp_refresh_token: 24 # часы
+
+username_validation:
+  min_length: 3
+  max_length: 20
+  allowed_characters: "A-Za-z0-9_-"
+  case_insensitive: true
+
+password_validation:
+  min_length: 8
+  max_length: 64
+  require_upper: true
+  require_lower: true
+  require_digit: true
+
+event_validation:
+  name_min_length: 3
+  name_max_length: 40
+  description_max_length: 200
+  description_required: true
+
+cleaner:
+  check_interval: 30m
+  event_lifetime: 24h

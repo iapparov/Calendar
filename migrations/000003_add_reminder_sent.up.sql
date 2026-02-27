@@ -1,0 +1,1 @@
+ALTER TABLE events ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE;
