@@ -5,7 +5,7 @@ server:
 logger:
   mode: "dev" # "dev" or "prod"
   level: "debug" # "debug", "info", "warn", "error"
-  buffer_size: 1000 # размер буфера для асинхронного логгера
+  buffer_size: 1000 # async logger buffer size
 
 gin:
   mode: "release"
@@ -27,8 +27,8 @@ mail:
   smtp_port: 587
 
 jwt:
-  exp_access_token: 15 # минуты
-  exp_refresh_token: 24 # часы
+  exp_access_token: 15 # minutes
+  exp_refresh_token: 1440 # minutes (24 hours)
 
 username_validation:
   min_length: 3
@@ -51,4 +51,4 @@ event_validation:
 
 cleaner:
   check_interval: 30m
-  event_lifetime: 24h
+  event_lifetime: 1440m

@@ -33,8 +33,8 @@ type JwtAuthService interface {
 }
 
 type StorageService interface {
-	GetUser(login string, ctx context.Context) (*user.User, error)
-	SaveUser(user *user.User, ctx context.Context) error
+	GetUser(ctx context.Context, login string) (*user.User, error)
+	SaveUser(ctx context.Context, user *user.User) error
 }
 
 func NewService(repo StorageService, jwt JwtAuthService, cfg *config.App, logger *logger.Service) *Service {
@@ -46,13 +46,13 @@ func NewService(repo StorageService, jwt JwtAuthService, cfg *config.App, logger
 	}
 }
 
-func (s *Service) Login(login, password string, ctx context.Context) (*jwt.AuthTokens, error) {
+func (s *Service) Login(ctx context.Context, login, password string) (*jwt.AuthTokens, error) {
 	if login == "" || password == "" {
 		s.logger.Log(zapcore.DebugLevel, "empty login or password")
 		return nil, domain.ErrEmptyField
 	}
 
-	usr, err := s.repo.GetUser(login, ctx)
+	usr, err := s.repo.GetUser(ctx, login)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +71,13 @@ func (s *Service) Login(login, password string, ctx context.Context) (*jwt.AuthT
 	return jwtresp, nil
 }
 
-func (s *Service) Register(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
-	if err := s.isValidlogin(login); err != nil {
+func (s *Service) Register(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
+	if err := s.isValidLogin(login); err != nil {
 		s.logger.Log(zapcore.DebugLevel, "invalid login", zap.Error(err))
 		return nil, err
 	}
 
-	if err := s.isValidpassword(password); err != nil {
+	if err := s.isValidPassword(password); err != nil {
 		s.logger.Log(zapcore.DebugLevel, "invalid password", zap.Error(err))
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (s *Service) Register(login, password, email, telegram string, ctx context.
 		return nil, err
 	}
 
-	ch, err := s.repo.GetUser(login, ctx)
+	ch, err := s.repo.GetUser(ctx, login)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		s.logger.Log(zapcore.ErrorLevel, "error checking existing user", zap.Error(err))
 		return nil, err
@@ -110,7 +110,7 @@ func (s *Service) Register(login, password, email, telegram string, ctx context.
 		return nil, err
 	}
 
-	err = s.repo.SaveUser(usr, ctx)
+	err = s.repo.SaveUser(ctx, usr)
 
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "save user error", zap.Error(err))
@@ -139,7 +139,7 @@ func (s *Service) ValidateTokens(tokenStr string) (*jwt.Payload, error) {
 	return payload, nil
 }
 
-func (s *Service) isValidlogin(login string) error {
+func (s *Service) isValidLogin(login string) error {
 	cfg := s.cfg.UserValidation
 	if utf8.RuneCountInString(login) < cfg.MinLength || utf8.RuneCountInString(login) > cfg.MaxLength {
 		return fmt.Errorf("%w: must be between %d and %d characters", domain.ErrInvalidLogin, cfg.MinLength, cfg.MaxLength)
@@ -153,7 +153,7 @@ func (s *Service) isValidlogin(login string) error {
 	return nil
 }
 
-func (s *Service) isValidpassword(password string) error {
+func (s *Service) isValidPassword(password string) error {
 	cfg := s.cfg.PasswordValidation
 
 	l := utf8.RuneCountInString(password)
@@ -209,11 +209,11 @@ func (s *Service) isValidTelegramChatId(chatId string) error {
 
 func (s *Service) isValidEmail(email string) error {
 	l := utf8.RuneCountInString(email)
-	if l < 6 { // 1@1.ru от 6 символов
+	if l < 6 { // minimum email: a@b.cc (6 chars)
 		return fmt.Errorf("%w: must be at least 6 characters", domain.ErrInvalidEmail)
 	}
 
-	re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`) // для базовой проверки формата asda@asdasd.asdads
+	re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`) // basic email format validation
 	if !re.MatchString(email) {
 		return fmt.Errorf("%w: invalid email format", domain.ErrInvalidEmail)
 	}

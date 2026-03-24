@@ -24,7 +24,7 @@ func TestNewUser_Success(t *testing.T) {
 	}
 
 	// Check UUID
-	if user.Id == uuid.Nil {
+	if user.ID == uuid.Nil {
 		t.Error("user ID should not be nil")
 	}
 
@@ -112,7 +112,7 @@ func TestNewUser_UniqueIDs(t *testing.T) {
 	user1, _ := NewUser("user1", "pass", "u1@example.com", "")
 	user2, _ := NewUser("user2", "pass", "u2@example.com", "")
 
-	if user1.Id == user2.Id {
+	if user1.ID == user2.ID {
 		t.Error("different users should have different IDs")
 	}
 }

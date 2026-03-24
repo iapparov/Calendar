@@ -14,11 +14,11 @@ func (h *reminderHeap) Swap(i, j int) {
 	(*h)[i], (*h)[j] = (*h)[j], (*h)[i]
 }
 
-func (h *reminderHeap) Push(x interface{}) {
+func (h *reminderHeap) Push(x any) {
 	*h = append(*h, x.(*event.Event))
 }
 
-func (h *reminderHeap) Pop() interface{} {
+func (h *reminderHeap) Pop() any {
 	old := *h
 	n := len(old)
 	item := old[n-1]

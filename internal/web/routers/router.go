@@ -30,18 +30,18 @@ func RegisterRoutes(engine *gin.Engine, hEvent *handlers.CalendarHandler, hUser 
 	api := engine.Group("/api/v1")
 
 	api.GET("/swagger/*any", gin.WrapH(httpSwagger.WrapHandler))
-	eventApi := api.Group("/event")
+	eventApi := api.Group("/events")
 	authApi := api.Group("/auth")
 
 	authApi.POST("/login", hUser.Login)
 	authApi.POST("/register", hUser.Register)
 	authApi.POST("/refresh-token", hUser.RefreshToken)
 
-	eventApi.Use(AuthMiddleware(hUser.Service))
-	eventApi.POST("/create_event", hEvent.CreateEvent)
-	eventApi.PUT("/update_event", hEvent.UpdateEvent)
-	eventApi.DELETE("/delete_event", hEvent.DeleteEvent)
-	eventApi.GET("/events_for_day", hEvent.EventsForDay)
-	eventApi.GET("/events_for_week", hEvent.EventsForWeek)
-	eventApi.GET("/events_for_month", hEvent.EventsForMonth)
+	eventApi.Use(AuthMiddleware(hUser.Auth()))
+	eventApi.POST("", hEvent.CreateEvent)
+	eventApi.PUT("", hEvent.UpdateEvent)
+	eventApi.DELETE("", hEvent.DeleteEvent)
+	eventApi.GET("/day", hEvent.EventsForDay)
+	eventApi.GET("/week", hEvent.EventsForWeek)
+	eventApi.GET("/month", hEvent.EventsForMonth)
 }

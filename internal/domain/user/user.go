@@ -1,13 +1,15 @@
 package user
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"time"
 )
 
+// User represents a registered user of the calendar application.
 type User struct {
-	Id        uuid.UUID
+	ID        uuid.UUID
 	Login     string
 	Password  []byte
 	CreatedAt time.Time
@@ -15,13 +17,14 @@ type User struct {
 	Telegram  string
 }
 
+// NewUser creates a new User with a bcrypt-hashed password.
 func NewUser(login, password, email, telegram string) (*User, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 	return &User{
-		Id:        uuid.New(),
+		ID:        uuid.New(),
 		Login:     login,
 		Password:  hashedPassword,
 		CreatedAt: time.Now(),

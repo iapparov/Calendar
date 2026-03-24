@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (p *Postgres) GetUser(login string, ctx context.Context) (*user.User, error) {
+func (p *Postgres) GetUser(ctx context.Context, login string) (*user.User, error) {
 	query := `
 		SELECT id, login, password, created_at, email, telegram
 		FROM users
@@ -19,7 +19,7 @@ func (p *Postgres) GetUser(login string, ctx context.Context) (*user.User, error
 	return p.getUser(ctx, query, login)
 }
 
-func (p *Postgres) GetUserbyUUID(id string, ctx context.Context) (*user.User, error) {
+func (p *Postgres) GetUserByUUID(ctx context.Context, id string) (*user.User, error) {
 	query := `
 		SELECT id, login, password, created_at, email, telegram
 		FROM users
@@ -42,7 +42,7 @@ func (p *Postgres) getUser(
 		query,
 		arg,
 	).Scan(
-		&u.Id,
+		&u.ID,
 		&u.Login,
 		&u.Password,
 		&u.CreatedAt,
@@ -60,7 +60,7 @@ func (p *Postgres) getUser(
 	return &u, nil
 }
 
-func (p *Postgres) SaveUser(user *user.User, ctx context.Context) error {
+func (p *Postgres) SaveUser(ctx context.Context, u *user.User) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.WriteTimeout)
 	defer cancel()
 
@@ -72,12 +72,12 @@ func (p *Postgres) SaveUser(user *user.User, ctx context.Context) error {
 	_, err := p.db.Exec(
 		ctxWithTimeout,
 		query,
-		user.Id,
-		user.Login,
-		user.Password,
-		user.CreatedAt,
-		user.Email,
-		user.Telegram,
+		u.ID,
+		u.Login,
+		u.Password,
+		u.CreatedAt,
+		u.Email,
+		u.Telegram,
 	)
 
 	if err != nil {

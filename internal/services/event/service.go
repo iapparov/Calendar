@@ -28,13 +28,13 @@ type NotificationService interface {
 }
 
 type StorageService interface {
-	Save(event *event.Event, ctx context.Context) error
-	Delete(eventId, userId uuid.UUID, ctx context.Context) error
-	Update(event *event.Event, ctx context.Context) error
-	Get(eventId, userId uuid.UUID, ctx context.Context) (*event.Event, error)
-	LoadDay(userId uuid.UUID, date time.Time, ctx context.Context) ([]*event.Event, error)
-	LoadWeek(userId uuid.UUID, weekStart time.Time, ctx context.Context) ([]*event.Event, error)
-	LoadMonth(userId uuid.UUID, monthStart time.Time, ctx context.Context) ([]*event.Event, error)
+	Save(ctx context.Context, event *event.Event) error
+	Delete(ctx context.Context, eventID, userID uuid.UUID) error
+	Update(ctx context.Context, event *event.Event) error
+	Get(ctx context.Context, eventID, userID uuid.UUID) (*event.Event, error)
+	LoadDay(ctx context.Context, userID uuid.UUID, date time.Time) ([]*event.Event, error)
+	LoadWeek(ctx context.Context, userID uuid.UUID, weekStart time.Time) ([]*event.Event, error)
+	LoadMonth(ctx context.Context, userID uuid.UUID, monthStart time.Time) ([]*event.Event, error)
 }
 
 func NewEventService(repo StorageService, notifier NotificationService, logger *logger.Service, config *config.App) *Service {
@@ -46,49 +46,49 @@ func NewEventService(repo StorageService, notifier NotificationService, logger *
 	}
 }
 
-func (s *Service) Save(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error) {
+func (s *Service) Save(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error) {
 
-	err := s.eventValidation(eventName, eventText, date, reminder, userId)
+	err := s.eventValidation(eventName, eventText, date, reminder, userID)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "eventValidation failed", zap.Error(err))
 		return nil, err
 	}
-	evt, err := event.NewEvent(date, userId, eventName, eventText, event.StatusActive, reminder)
+	evt, err := event.NewEvent(date, userID, eventName, eventText, event.StatusActive, reminder)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "event creation failed", zap.Error(err))
 		return nil, err
 	}
-	err = s.repo.Save(evt, ctx)
+	err = s.repo.Save(ctx, evt)
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "event save error", zap.Error(err))
 		return nil, err
 	}
-	s.logger.Log(zapcore.DebugLevel, "event saved", zap.String("event_id", evt.EventId.String()))
+	s.logger.Log(zapcore.DebugLevel, "event saved", zap.String("event_id", evt.EventID.String()))
 
 	err = s.notifier.Send(evt)
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "event notification error", zap.Error(err))
 		return nil, err
 	}
-	s.logger.Log(zapcore.DebugLevel, "event notification sent", zap.String("event_id", evt.EventId.String()))
+	s.logger.Log(zapcore.DebugLevel, "event notification sent", zap.String("event_id", evt.EventID.String()))
 
 	return evt, nil
 }
 
-func (s *Service) Delete(eventId, userId string, ctx context.Context) error {
-	eid, err := uuid.Parse(eventId)
+func (s *Service) Delete(ctx context.Context, eventID, userID string) error {
+	eid, err := uuid.Parse(eventID)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "event id parse error", zap.Error(err))
 		return err
 	}
 
-	uid, err := uuid.Parse(userId)
+	uid, err := uuid.Parse(userID)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "user id parse error", zap.Error(err))
 		return err
 	}
 
-	err = s.repo.Delete(eid, uid, ctx)
+	err = s.repo.Delete(ctx, eid, uid)
 	if err != nil && errors.Is(err, domain.ErrEventNotFound) {
 		s.logger.Log(zapcore.DebugLevel, "event not found", zap.String("event_id", eid.String()))
 		return domain.ErrEventNotFound
@@ -101,22 +101,22 @@ func (s *Service) Delete(eventId, userId string, ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) Update(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
-	eid, err := uuid.Parse(eventId)
+func (s *Service) Update(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
+	eid, err := uuid.Parse(eventID)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "event id parse error", zap.Error(err))
 		return nil, err
 	}
 
-	err = s.eventValidation(eventName, eventText, date, reminder, userId)
+	err = s.eventValidation(eventName, eventText, date, reminder, userID)
 	if err != nil {
 		s.logger.Log(zapcore.DebugLevel, "eventValidation failed", zap.Error(err))
 		return nil, err
 	}
 
-	uid, _ := uuid.Parse(userId)
+	uid, _ := uuid.Parse(userID)
 
-	evt, err := s.repo.Get(eid, uid, ctx)
+	evt, err := s.repo.Get(ctx, eid, uid)
 	if err != nil && evt == nil {
 		s.logger.Log(zapcore.ErrorLevel, "event update error (Get)", zap.Error(err))
 		return nil, err
@@ -131,7 +131,7 @@ func (s *Service) Update(eventId, userId, date, eventText, eventName, reminder s
 		s.logger.Log(zapcore.DebugLevel, "event update failed", zap.Error(err))
 		return nil, err
 	}
-	err = s.repo.Update(evt, ctx)
+	err = s.repo.Update(ctx, evt)
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "event save after update error", zap.Error(err))
 		return nil, err
@@ -141,42 +141,42 @@ func (s *Service) Update(eventId, userId, date, eventText, eventName, reminder s
 	return evt, nil
 }
 
-func (s *Service) LoadDay(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+func (s *Service) LoadDay(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 	d, uid, err := s.parser(userID, date)
 	if err != nil {
 		return nil, err
 	}
-	evts, err := s.repo.LoadDay(uid, d, ctx)
+	evts, err := s.repo.LoadDay(ctx, uid, d)
 	if err != nil {
-		s.logger.Log(zapcore.ErrorLevel, fmt.Sprintf("load day events error: %v", err))
+		s.logger.Log(zapcore.ErrorLevel, "load day events error", zap.Error(err))
 		return nil, err
 	}
 	s.logger.Log(zapcore.DebugLevel, "day events loaded", zap.String("user_id", userID), zap.String("date", date))
 	return evts, nil
 }
 
-func (s *Service) LoadWeek(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+func (s *Service) LoadWeek(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 	d, uid, err := s.parser(userID, date)
 	if err != nil {
 		return nil, err
 	}
-	evts, err := s.repo.LoadWeek(uid, d, ctx)
+	evts, err := s.repo.LoadWeek(ctx, uid, d)
 	if err != nil {
-		s.logger.Log(zapcore.ErrorLevel, fmt.Sprintf("load week events error: %v", err))
+		s.logger.Log(zapcore.ErrorLevel, "load week events error", zap.Error(err))
 		return nil, err
 	}
 	s.logger.Log(zapcore.DebugLevel, "week events loaded", zap.String("user_id", userID), zap.String("week_start", date))
 	return evts, nil
 }
 
-func (s *Service) LoadMonth(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+func (s *Service) LoadMonth(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 	d, uid, err := s.parser(userID, date)
 	if err != nil {
 		return nil, err
 	}
-	evts, err := s.repo.LoadMonth(uid, d, ctx)
+	evts, err := s.repo.LoadMonth(ctx, uid, d)
 	if err != nil {
-		s.logger.Log(zapcore.ErrorLevel, fmt.Sprintf("load month events error: %v", err))
+		s.logger.Log(zapcore.ErrorLevel, "load month events error", zap.Error(err))
 		return nil, err
 	}
 	s.logger.Log(zapcore.DebugLevel, "month events loaded", zap.String("user_id", userID), zap.String("month_start", date))
@@ -211,8 +211,8 @@ func (s *Service) eventValidation(name string, description string, date string, 
 	if err != nil {
 		return fmt.Errorf("%w: %v", domain.ErrInvalidEventDate, err)
 	}
-	// Сравниваем только даты (без времени) - разрешаем события день в день
-	// Получаем сегодняшнюю дату в локальном времени
+	// Compare dates only (no time) — allow events on the same day
+	// Get today's date in local time
 	now := time.Now()
 	todayDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	eventDate := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, time.Local)

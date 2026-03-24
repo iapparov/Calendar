@@ -20,11 +20,11 @@ type mockAuthService struct {
 	validateTokensFunc func(tokenStr string) (*jwt.Payload, error)
 }
 
-func (m *mockAuthService) Login(login, password string, ctx context.Context) (*jwt.AuthTokens, error) {
+func (m *mockAuthService) Login(ctx context.Context, login, password string) (*jwt.AuthTokens, error) {
 	return nil, nil
 }
 
-func (m *mockAuthService) Register(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
+func (m *mockAuthService) Register(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
 	return nil, nil
 }
 

@@ -11,36 +11,41 @@ import (
 )
 
 type UserHandler struct {
-	Service AuthService
+	service AuthService
 }
 
 type AuthService interface {
-	Login(login, password string, ctx context.Context) (*jwt.AuthTokens, error)
-	Register(login, password, email, telegram string, ctx context.Context) (*user.User, error)
+	Login(ctx context.Context, login, password string) (*jwt.AuthTokens, error)
+	Register(ctx context.Context, login, password, email, telegram string) (*user.User, error)
 	RefreshTokens(tokenStr string) (*jwt.AuthTokens, error)
 	ValidateTokens(tokenStr string) (*jwt.Payload, error)
 }
 
 func NewUserHandler(service AuthService) *UserHandler {
 	return &UserHandler{
-		Service: service,
+		service: service,
 	}
+}
+
+// Auth returns the underlying AuthService for use in middleware.
+func (h *UserHandler) Auth() AuthService {
+	return h.service
 }
 
 const (
 	CtxUserID = "user_id"
 )
 
-// @Summary Регистрация нового пользователя
-// @Description Регистрирует нового пользователя с указанными данными
+// @Summary Register a new user
+// @Description Registers a new user with the provided data
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body dto.RegisterRequest true "Данные для регистрации"
+// @Param request body dto.RegisterRequest true "Registration data"
 // @Success 200 {object} dto.RegisterResponse
-// @Failure 400 {object} map[string]string{} "Сообщение об ошибке"
-// @Failure 409 {object} map[string]string{} "Сообщение об ошибке"
-// @Failure 500 {object} map[string]string{} "Сообщение об ошибке"
+// @Failure 400 {object} map[string]string{} "Error message"
+// @Failure 409 {object} map[string]string{} "Error message"
+// @Failure 500 {object} map[string]string{} "Error message"
 // @Router /api/v1/auth/register [post]
 func (h *UserHandler) Register(ctx *gin.Context) {
 	var req dto.RegisterRequest
@@ -48,7 +53,7 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	usr, err := h.Service.Register(req.Login, req.Password, req.Email, req.Telegram, ctx.Request.Context())
+	usr, err := h.service.Register(ctx.Request.Context(), req.Login, req.Password, req.Email, req.Telegram)
 	if err != nil {
 		if isValidationError(err) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -62,7 +67,7 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 		return
 	}
 	res := dto.RegisterResponse{
-		ID:       usr.Id.String(),
+		ID:       usr.ID.String(),
 		Login:    usr.Login,
 		Email:    usr.Email,
 		Telegram: usr.Telegram,
@@ -70,15 +75,15 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-// @Summary Авторизация пользователя
-// @Description Выполняет вход пользователя и возвращает JWT токены
+// @Summary User login
+// @Description Authenticates the user and returns JWT tokens
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body dto.LoginRequest true "Логин и пароль"
+// @Param request body dto.LoginRequest true "Login credentials"
 // @Success 200 {object} dto.AuthTokens
-// @Failure 400 {object} map[string]string{} "Сообщение об ошибке"
-// @Failure 401 {object} map[string]string{} "Сообщение об ошибке"
+// @Failure 400 {object} map[string]string{} "Error message"
+// @Failure 401 {object} map[string]string{} "Error message"
 // @Router /api/v1/auth/login [post]
 func (h *UserHandler) Login(ctx *gin.Context) {
 	var req dto.LoginRequest
@@ -86,7 +91,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	jwtResp, err := h.Service.Login(req.Login, req.Password, ctx.Request.Context())
+	jwtResp, err := h.service.Login(ctx.Request.Context(), req.Login, req.Password)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -98,15 +103,15 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, res)
 }
 
-// @Summary Обновление токенов
-// @Description Обновляет пару access/refresh токенов по refresh токену
+// @Summary Refresh tokens
+// @Description Refreshes the access/refresh token pair using a refresh token
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body dto.TokenRefreshRequest true "Refresh токен"
+// @Param request body dto.TokenRefreshRequest true "Refresh token"
 // @Success 200 {object} dto.AuthTokens
-// @Failure 400 {object} map[string]string{} "Сообщение об ошибке"
-// @Failure 401 {object} map[string]string{} "Сообщение об ошибке"
+// @Failure 400 {object} map[string]string{} "Error message"
+// @Failure 401 {object} map[string]string{} "Error message"
 // @Router /api/v1/auth/refresh-token [post]
 func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 	var req dto.TokenRefreshRequest
@@ -114,7 +119,7 @@ func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	jwtResp, err := h.Service.RefreshTokens(req.RefreshToken)
+	jwtResp, err := h.service.RefreshTokens(req.RefreshToken)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

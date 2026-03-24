@@ -14,14 +14,14 @@ func createTestService() *Service {
 	return &Service{
 		accessSecret:    "test-access-secret-key-12345",
 		refreshSecret:   "test-refresh-secret-key-12345",
-		ExpAccessToken:  15,
-		ExpRefreshToken: 24,
+		expAccessToken:  15,
+		expRefreshToken: 24,
 	}
 }
 
 func createTestUser() *user.User {
 	return &user.User{
-		Id:    uuid.New(),
+		ID:    uuid.New(),
 		Login: "testuser",
 	}
 }
@@ -44,11 +44,11 @@ func TestNewService(t *testing.T) {
 	if service.refreshSecret != "refresh-secret" {
 		t.Errorf("expected refreshSecret 'refresh-secret', got '%s'", service.refreshSecret)
 	}
-	if service.ExpAccessToken != 30 {
-		t.Errorf("expected ExpAccessToken 30, got %d", service.ExpAccessToken)
+	if service.expAccessToken != 30 {
+		t.Errorf("expected expAccessToken 30, got %d", service.expAccessToken)
 	}
-	if service.ExpRefreshToken != 48 {
-		t.Errorf("expected ExpRefreshToken 48, got %d", service.ExpRefreshToken)
+	if service.expRefreshToken != 48 {
+		t.Errorf("expected expRefreshToken 48, got %d", service.expRefreshToken)
 	}
 }
 
@@ -88,8 +88,8 @@ func TestValidateTokens_Success(t *testing.T) {
 	if payload == nil {
 		t.Fatal("payload should not be nil")
 	}
-	if payload.UserID != user.Id.String() {
-		t.Errorf("expected user ID '%s', got '%s'", user.Id.String(), payload.UserID)
+	if payload.UserID != user.ID.String() {
+		t.Errorf("expected user ID '%s', got '%s'", user.ID.String(), payload.UserID)
 	}
 }
 
@@ -108,8 +108,8 @@ func TestValidateTokens_WrongSecret(t *testing.T) {
 	service2 := &Service{
 		accessSecret:    "different-secret",
 		refreshSecret:   "different-secret",
-		ExpAccessToken:  15,
-		ExpRefreshToken: 24,
+		expAccessToken:  15,
+		expRefreshToken: 24,
 	}
 
 	user := createTestUser()
@@ -126,8 +126,8 @@ func TestValidateTokens_ExpiredToken(t *testing.T) {
 	service := &Service{
 		accessSecret:    "test-secret",
 		refreshSecret:   "test-secret",
-		ExpAccessToken:  -1, // Already expired
-		ExpRefreshToken: 24,
+		expAccessToken:  -1, // Already expired
+		expRefreshToken: 24,
 	}
 
 	user := createTestUser()
@@ -191,7 +191,7 @@ func TestValidateTokens_AlgorithmConfusion(t *testing.T) {
 
 	// Create a token with "none" algorithm
 	claims := jwt.MapClaims{
-		"uuid": user.Id.String(),
+		"uuid": user.ID.String(),
 		"exp":  time.Now().Add(time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
@@ -219,8 +219,8 @@ func TestGenerateTokens_ContainsExpectedClaims(t *testing.T) {
 
 	claims := token.Claims.(jwt.MapClaims)
 
-	if claims["uuid"] != testUser.Id.String() {
-		t.Errorf("expected uuid '%s', got '%v'", testUser.Id.String(), claims["uuid"])
+	if claims["uuid"] != testUser.ID.String() {
+		t.Errorf("expected uuid '%s', got '%v'", testUser.ID.String(), claims["uuid"])
 	}
 
 	if _, ok := claims["exp"]; !ok {

@@ -13,39 +13,42 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Service manages notification delivery via email and Telegram channels.
 type Service struct {
 	ntfch           chan *event.Event
 	userRepo        StorageService
 	reminderRepo    ReminderStorageService
-	EmailChannel    *EmailChannel
-	TelegramChannel *TelegramChannel
+	emailChannel    *EmailChannel
+	telegramChannel *TelegramChannel
 	logger          *logger.Service
 	wg              sync.WaitGroup
 	cancel          context.CancelFunc
 }
 
+// StorageService provides access to user data for sending notifications.
 type StorageService interface {
-	GetUserbyUUID(id string, ctx context.Context) (*user.User, error)
+	GetUserByUUID(ctx context.Context, id string) (*user.User, error)
 }
 
-// ReminderStorageService интерфейс для загрузки напоминаний при прогреве
+// ReminderStorageService provides access to pending reminders for warm-up on start.
 type ReminderStorageService interface {
 	LoadPendingReminders(ctx context.Context) ([]*event.Event, error)
-	MarkReminderSent(eventID string, ctx context.Context) error
+	MarkReminderSent(ctx context.Context, eventID string) error
 }
 
+// NewService creates a new notification sender service.
 func NewService(repo StorageService, reminderRepo ReminderStorageService, emailCh *EmailChannel, telegramCh *TelegramChannel, logger *logger.Service) *Service {
 	return &Service{
 		userRepo:        repo,
 		reminderRepo:    reminderRepo,
 		ntfch:           make(chan *event.Event, 100),
-		EmailChannel:    emailCh,
-		TelegramChannel: telegramCh,
+		emailChannel:    emailCh,
+		telegramChannel: telegramCh,
 		logger:          logger,
 	}
 }
 
-// warmUp загружает pending напоминания из базы данных при старте
+// warmUp loads pending reminders from the database on startup.
 func (s *Service) warmUp(ctx context.Context) error {
 	events, err := s.reminderRepo.LoadPendingReminders(ctx)
 	if err != nil {
@@ -59,7 +62,7 @@ func (s *Service) warmUp(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			s.logger.Log(zapcore.WarnLevel, "warmUp: notification channel is full, skipping event",
-				zap.String("event_id", ev.EventId.String()))
+				zap.String("event_id", ev.EventID.String()))
 		}
 	}
 
@@ -69,14 +72,16 @@ func (s *Service) warmUp(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) Send(event *event.Event) error {
-	if event.Reminder.IsZero() || time.Until(event.Reminder) <= 0 {
+// Send enqueues an event for notification delivery.
+func (s *Service) Send(ev *event.Event) error {
+	if ev.Reminder.IsZero() || time.Until(ev.Reminder) <= 0 {
 		return nil
 	}
-	s.ntfch <- event
+	s.ntfch <- ev
 	return nil
 }
 
+// Notifier processes the notification queue using a min-heap timer.
 func (s *Service) Notifier(ctx context.Context) {
 	h := &reminderHeap{}
 	heap.Init(h)
@@ -96,14 +101,12 @@ func (s *Service) Notifier(ctx context.Context) {
 			}
 			return
 
-		// Новая задача
 		case ev := <-s.ntfch:
 			if ev.Reminder.IsZero() || time.Until(ev.Reminder) <= 0 {
 				continue
 			}
 
 			heap.Push(h, ev)
-			// если это ближайшее — пересоздаём таймер
 			if (*h)[0] == ev {
 				if timer != nil {
 					timer.Stop()
@@ -115,12 +118,10 @@ func (s *Service) Notifier(ctx context.Context) {
 				timer = time.NewTimer(delay)
 			}
 
-		// Сработал таймер
 		case <-timerCh:
 			item := heap.Pop(h).(*event.Event)
-			s.sendReminder(item, ctx)
+			s.sendReminder(ctx, item)
 
-			// ставим таймер на следующее
 			if h.Len() > 0 {
 				next := (*h)[0]
 				delay := time.Until(next.Reminder)
@@ -135,8 +136,8 @@ func (s *Service) Notifier(ctx context.Context) {
 	}
 }
 
-func (s *Service) sendReminder(ev *event.Event, ctx context.Context) {
-	usr, err := s.userRepo.GetUserbyUUID(ev.UserID.String(), ctx)
+func (s *Service) sendReminder(ctx context.Context, ev *event.Event) {
+	usr, err := s.userRepo.GetUserByUUID(ctx, ev.UserID.String())
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "cannot get user", zap.Error(err))
 		return
@@ -146,7 +147,7 @@ func (s *Service) sendReminder(ev *event.Event, ctx context.Context) {
 
 	sent := false
 	if usr.Email != "" {
-		err = s.EmailChannel.Send(usr.Email, ev.Name, ev.Text, ev.Date)
+		err = s.emailChannel.Send(usr.Email, ev.Name, ev.Text, ev.Date)
 		if err != nil {
 			s.logger.Log(zapcore.WarnLevel, "cannot send email", zap.Error(err))
 		} else {
@@ -154,7 +155,7 @@ func (s *Service) sendReminder(ev *event.Event, ctx context.Context) {
 		}
 	}
 	if usr.Telegram != "" {
-		err = s.TelegramChannel.Send(usr.Telegram, ev.Name, ev.Text, ev.Date)
+		err = s.telegramChannel.Send(usr.Telegram, ev.Name, ev.Text, ev.Date)
 		if err != nil {
 			s.logger.Log(zapcore.WarnLevel, "cannot send telegram message", zap.Error(err))
 		} else {
@@ -162,19 +163,18 @@ func (s *Service) sendReminder(ev *event.Event, ctx context.Context) {
 		}
 	}
 
-	// Отмечаем уведомление как отправленное
 	if sent {
-		if err := s.reminderRepo.MarkReminderSent(ev.EventId.String(), ctx); err != nil {
+		if err := s.reminderRepo.MarkReminderSent(ctx, ev.EventID.String()); err != nil {
 			s.logger.Log(zapcore.ErrorLevel, "failed to mark reminder as sent", zap.Error(err))
 		}
 	}
 }
 
+// Start begins the notification sender goroutine.
 func (s *Service) Start(ctx context.Context) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 
-	// Прогрев: загружаем pending напоминания из БД
 	if err := s.warmUp(ctxWithCancel); err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "failed to warm up sender service", zap.Error(err))
 	}
@@ -186,6 +186,7 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
+// Stop gracefully shuts down the sender service.
 func (s *Service) Stop(ctx context.Context) error {
 	s.cancel()
 

@@ -250,6 +250,10 @@
             if (body) options.body = JSON.stringify(body);
             try {
                 const response = await fetch(`${API_BASE}${endpoint}`, options);
+                if (response.status === 204) {
+                    showResponse({ message: 'Success (No Content)' }, true);
+                    return { ok: true, data: null };
+                }
                 const data = await response.json();
                 showResponse(data, response.ok);
                 return { ok: response.ok, data };
@@ -298,7 +302,7 @@
             const reminder_time = document.getElementById('reminderDate').value;
             const event_text = document.getElementById('eventDescription').value;
 
-            const result = await apiRequest('/event/create_event', 'POST', { event_name, date, reminder_time, event: event_text });
+            const result = await apiRequest('/events', 'POST', { event_name, date, reminder_time, event: event_text });
 
             if (result.ok && result.data) {
                 resultDiv.innerHTML = `✅ Событие создано! <br><strong>ID:</strong> <code>${result.data.event_id}</code>`;
@@ -320,9 +324,9 @@
             const range = document.getElementById('getEventsRange').value;
             let endpoint = '';
             switch (range) {
-                case 'day': endpoint = `/event/events_for_day?date=${date}`; break;
-                case 'week': endpoint = `/event/events_for_week?date=${date}`; break;
-                case 'month': endpoint = `/event/events_for_month?date=${date}`; break;
+                case 'day': endpoint = `/events/day?date=${date}`; break;
+                case 'week': endpoint = `/events/week?date=${date}`; break;
+                case 'month': endpoint = `/events/month?date=${date}`; break;
             }
             const result = await apiRequest(endpoint, 'GET');
             if (result.ok && Array.isArray(result.data)) renderEventsList(result.data);
@@ -351,12 +355,12 @@
             const date = document.getElementById('updateEventDate').value;
             const reminder_time = document.getElementById('updateReminderDate').value;
             const event = document.getElementById('updateEventDescription').value;
-            await apiRequest('/event/update_event', 'PUT', { event_id, event_name, date, reminder_time, event });
+            await apiRequest('/events', 'PUT', { event_id, event_name, date, reminder_time, event });
         }
 
         async function deleteEvent() {
             const event_id = document.getElementById('deleteEventId').value;
-            await apiRequest('/event/delete_event', 'DELETE', { event_id });
+            await apiRequest('/events', 'DELETE', { event_id });
         }
 
         async function refreshToken() {

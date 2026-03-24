@@ -33,7 +33,7 @@ func NewTelegramChannel(cfg *config.App, logger *logger.Service) (*TelegramChann
 	return tc, nil
 }
 
-// Send — реализация интерфейса Sender
+// Send delivers a notification via Telegram.
 func (t *TelegramChannel) Send(tg string, eventName string, eventText string, eventDate time.Time) error {
 	chatId, err := strconv.Atoi(tg)
 	if err != nil {

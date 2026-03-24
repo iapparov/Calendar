@@ -20,74 +20,74 @@ import (
 
 // Mock EventService
 type mockEventService struct {
-	saveFunc      func(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error)
-	updateFunc    func(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error)
-	deleteFunc    func(eventId, userId string, ctx context.Context) error
-	loadDayFunc   func(userID string, date string, ctx context.Context) ([]*event.Event, error)
-	loadWeekFunc  func(userID string, weekStart string, ctx context.Context) ([]*event.Event, error)
-	loadMonthFunc func(userID string, monthStart string, ctx context.Context) ([]*event.Event, error)
+	saveFunc      func(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error)
+	updateFunc    func(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error)
+	deleteFunc    func(ctx context.Context, eventID, userID string) error
+	loadDayFunc   func(ctx context.Context, userID string, date string) ([]*event.Event, error)
+	loadWeekFunc  func(ctx context.Context, userID string, weekStart string) ([]*event.Event, error)
+	loadMonthFunc func(ctx context.Context, userID string, monthStart string) ([]*event.Event, error)
 }
 
-func (m *mockEventService) Save(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error) {
+func (m *mockEventService) Save(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error) {
 	if m.saveFunc != nil {
-		return m.saveFunc(userId, date, eventName, eventText, reminder, ctx)
+		return m.saveFunc(ctx, userID, date, eventName, eventText, reminder)
 	}
 	return nil, nil
 }
 
-func (m *mockEventService) Update(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
+func (m *mockEventService) Update(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
 	if m.updateFunc != nil {
-		return m.updateFunc(eventId, userId, date, eventText, eventName, reminder, ctx)
+		return m.updateFunc(ctx, eventID, userID, date, eventText, eventName, reminder)
 	}
 	return nil, nil
 }
 
-func (m *mockEventService) Delete(eventId, userId string, ctx context.Context) error {
+func (m *mockEventService) Delete(ctx context.Context, eventID, userID string) error {
 	if m.deleteFunc != nil {
-		return m.deleteFunc(eventId, userId, ctx)
+		return m.deleteFunc(ctx, eventID, userID)
 	}
 	return nil
 }
 
-func (m *mockEventService) LoadDay(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+func (m *mockEventService) LoadDay(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 	if m.loadDayFunc != nil {
-		return m.loadDayFunc(userID, date, ctx)
+		return m.loadDayFunc(ctx, userID, date)
 	}
 	return nil, nil
 }
 
-func (m *mockEventService) LoadWeek(userID string, weekStart string, ctx context.Context) ([]*event.Event, error) {
+func (m *mockEventService) LoadWeek(ctx context.Context, userID string, weekStart string) ([]*event.Event, error) {
 	if m.loadWeekFunc != nil {
-		return m.loadWeekFunc(userID, weekStart, ctx)
+		return m.loadWeekFunc(ctx, userID, weekStart)
 	}
 	return nil, nil
 }
 
-func (m *mockEventService) LoadMonth(userID string, monthStart string, ctx context.Context) ([]*event.Event, error) {
+func (m *mockEventService) LoadMonth(ctx context.Context, userID string, monthStart string) ([]*event.Event, error) {
 	if m.loadMonthFunc != nil {
-		return m.loadMonthFunc(userID, monthStart, ctx)
+		return m.loadMonthFunc(ctx, userID, monthStart)
 	}
 	return nil, nil
 }
 
 // Mock AuthService
 type mockAuthService struct {
-	loginFunc          func(login, password string, ctx context.Context) (*jwt.AuthTokens, error)
-	registerFunc       func(login, password, email, telegram string, ctx context.Context) (*user.User, error)
+	loginFunc          func(ctx context.Context, login, password string) (*jwt.AuthTokens, error)
+	registerFunc       func(ctx context.Context, login, password, email, telegram string) (*user.User, error)
 	refreshTokensFunc  func(tokenStr string) (*jwt.AuthTokens, error)
 	validateTokensFunc func(tokenStr string) (*jwt.Payload, error)
 }
 
-func (m *mockAuthService) Login(login, password string, ctx context.Context) (*jwt.AuthTokens, error) {
+func (m *mockAuthService) Login(ctx context.Context, login, password string) (*jwt.AuthTokens, error) {
 	if m.loginFunc != nil {
-		return m.loginFunc(login, password, ctx)
+		return m.loginFunc(ctx, login, password)
 	}
 	return nil, nil
 }
 
-func (m *mockAuthService) Register(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
+func (m *mockAuthService) Register(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
 	if m.registerFunc != nil {
-		return m.registerFunc(login, password, email, telegram, ctx)
+		return m.registerFunc(ctx, login, password, email, telegram)
 	}
 	return nil, nil
 }
@@ -125,7 +125,7 @@ func TestNewCalendarHandler(t *testing.T) {
 
 func TestCreateEvent_Success(t *testing.T) {
 	expectedEvent := &event.Event{
-		EventId: uuid.New(),
+		EventID: uuid.New(),
 		UserID:  uuid.New(),
 		Date:    time.Now(),
 		Name:    "Test Event",
@@ -134,7 +134,7 @@ func TestCreateEvent_Success(t *testing.T) {
 	}
 
 	mock := &mockEventService{
-		saveFunc: func(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error) {
+		saveFunc: func(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error) {
 			return expectedEvent, nil
 		},
 	}
@@ -180,7 +180,7 @@ func TestCreateEvent_NoUserID(t *testing.T) {
 
 func TestCreateEvent_ValidationError(t *testing.T) {
 	mock := &mockEventService{
-		saveFunc: func(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error) {
+		saveFunc: func(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error) {
 			return nil, domain.ErrInvalidEventName
 		},
 	}
@@ -207,7 +207,7 @@ func TestCreateEvent_ValidationError(t *testing.T) {
 
 func TestDeleteEvent_Success(t *testing.T) {
 	mock := &mockEventService{
-		deleteFunc: func(eventId, userId string, ctx context.Context) error {
+		deleteFunc: func(ctx context.Context, eventID, userID string) error {
 			return nil
 		},
 	}
@@ -234,7 +234,7 @@ func TestDeleteEvent_Success(t *testing.T) {
 
 func TestDeleteEvent_NotFound(t *testing.T) {
 	mock := &mockEventService{
-		deleteFunc: func(eventId, userId string, ctx context.Context) error {
+		deleteFunc: func(ctx context.Context, eventID, userID string) error {
 			return domain.ErrEventNotFound
 		},
 	}
@@ -261,12 +261,12 @@ func TestDeleteEvent_NotFound(t *testing.T) {
 
 func TestEventsForDay_Success(t *testing.T) {
 	events := []*event.Event{
-		{EventId: uuid.New(), Name: "Event 1"},
-		{EventId: uuid.New(), Name: "Event 2"},
+		{EventID: uuid.New(), Name: "Event 1"},
+		{EventID: uuid.New(), Name: "Event 2"},
 	}
 
 	mock := &mockEventService{
-		loadDayFunc: func(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+		loadDayFunc: func(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 			return events, nil
 		},
 	}
@@ -320,12 +320,12 @@ func TestEventsForDay_MissingDate(t *testing.T) {
 
 func TestUpdateEvent_Success(t *testing.T) {
 	updatedEvent := &event.Event{
-		EventId: uuid.New(),
+		EventID: uuid.New(),
 		Name:    "Updated Event",
 	}
 
 	mock := &mockEventService{
-		updateFunc: func(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
+		updateFunc: func(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
 			return updatedEvent, nil
 		},
 	}
@@ -409,11 +409,11 @@ func TestIsConflict(t *testing.T) {
 
 func TestEventsForWeek_Success(t *testing.T) {
 	events := []*event.Event{
-		{EventId: uuid.New(), Name: "Event 1"},
+		{EventID: uuid.New(), Name: "Event 1"},
 	}
 
 	mock := &mockEventService{
-		loadWeekFunc: func(userID string, weekStart string, ctx context.Context) ([]*event.Event, error) {
+		loadWeekFunc: func(ctx context.Context, userID string, weekStart string) ([]*event.Event, error) {
 			return events, nil
 		},
 	}
@@ -438,11 +438,11 @@ func TestEventsForWeek_Success(t *testing.T) {
 
 func TestEventsForMonth_Success(t *testing.T) {
 	events := []*event.Event{
-		{EventId: uuid.New(), Name: "Event 1"},
+		{EventID: uuid.New(), Name: "Event 1"},
 	}
 
 	mock := &mockEventService{
-		loadMonthFunc: func(userID string, monthStart string, ctx context.Context) ([]*event.Event, error) {
+		loadMonthFunc: func(ctx context.Context, userID string, monthStart string) ([]*event.Event, error) {
 			return events, nil
 		},
 	}
@@ -484,7 +484,7 @@ func TestEventsForDay_NoUserID(t *testing.T) {
 
 func TestEventsForDay_ServiceError(t *testing.T) {
 	mock := &mockEventService{
-		loadDayFunc: func(userID string, date string, ctx context.Context) ([]*event.Event, error) {
+		loadDayFunc: func(ctx context.Context, userID string, date string) ([]*event.Event, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -531,7 +531,7 @@ func TestCreateEvent_InvalidJSON(t *testing.T) {
 
 func TestCreateEvent_ServiceError(t *testing.T) {
 	mock := &mockEventService{
-		saveFunc: func(userId, date, eventName, eventText, reminder string, ctx context.Context) (*event.Event, error) {
+		saveFunc: func(ctx context.Context, userID, date, eventName, eventText, reminder string) (*event.Event, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -577,7 +577,7 @@ func TestUpdateEvent_NoUserID(t *testing.T) {
 
 func TestUpdateEvent_NotFound(t *testing.T) {
 	mock := &mockEventService{
-		updateFunc: func(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
+		updateFunc: func(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
 			return nil, domain.ErrEventNotFound
 		},
 	}
@@ -604,7 +604,7 @@ func TestUpdateEvent_NotFound(t *testing.T) {
 
 func TestUpdateEvent_ValidationError(t *testing.T) {
 	mock := &mockEventService{
-		updateFunc: func(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
+		updateFunc: func(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
 			return nil, domain.ErrInvalidEventName
 		},
 	}
@@ -631,7 +631,7 @@ func TestUpdateEvent_ValidationError(t *testing.T) {
 
 func TestUpdateEvent_ServiceError(t *testing.T) {
 	mock := &mockEventService{
-		updateFunc: func(eventId, userId, date, eventText, eventName, reminder string, ctx context.Context) (*event.Event, error) {
+		updateFunc: func(ctx context.Context, eventID, userID, date, eventText, eventName, reminder string) (*event.Event, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -677,7 +677,7 @@ func TestDeleteEvent_NoUserID(t *testing.T) {
 
 func TestDeleteEvent_ValidationError(t *testing.T) {
 	mock := &mockEventService{
-		deleteFunc: func(eventId, userId string, ctx context.Context) error {
+		deleteFunc: func(ctx context.Context, eventID, userID string) error {
 			return domain.ErrInvalidUserID
 		},
 	}
@@ -704,7 +704,7 @@ func TestDeleteEvent_ValidationError(t *testing.T) {
 
 func TestDeleteEvent_ServiceError(t *testing.T) {
 	mock := &mockEventService{
-		deleteFunc: func(eventId, userId string, ctx context.Context) error {
+		deleteFunc: func(ctx context.Context, eventID, userID string) error {
 			return errors.New("database error")
 		},
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (p *Postgres) Save(event *event.Event, ctx context.Context) error {
+func (p *Postgres) Save(ctx context.Context, ev *event.Event) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.WriteTimeout)
 	defer cancel()
 
@@ -24,13 +24,13 @@ func (p *Postgres) Save(event *event.Event, ctx context.Context) error {
 	_, err := p.db.Exec(
 		ctxWithTimeout,
 		query,
-		event.EventId,
-		event.UserID,
-		event.Date,
-		event.Name,
-		event.Text,
-		event.Status,
-		event.Reminder,
+		ev.EventID,
+		ev.UserID,
+		ev.Date,
+		ev.Name,
+		ev.Text,
+		ev.Status,
+		ev.Reminder,
 	)
 
 	if err != nil {
@@ -39,7 +39,7 @@ func (p *Postgres) Save(event *event.Event, ctx context.Context) error {
 	return nil
 }
 
-func (p *Postgres) Delete(eventId, userId uuid.UUID, ctx context.Context) error {
+func (p *Postgres) Delete(ctx context.Context, eventID, userID uuid.UUID) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.WriteTimeout)
 	defer cancel()
 
@@ -52,8 +52,8 @@ func (p *Postgres) Delete(eventId, userId uuid.UUID, ctx context.Context) error 
 		ctxWithTimeout,
 		query,
 		event.StatusArchive,
-		eventId,
-		userId,
+		eventID,
+		userID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to execute delete event query: %w", err)
@@ -65,10 +65,9 @@ func (p *Postgres) Delete(eventId, userId uuid.UUID, ctx context.Context) error 
 		return domain.ErrEventNotFound
 	}
 	return nil
-
 }
 
-func (p *Postgres) Update(event *event.Event, ctx context.Context) error {
+func (p *Postgres) Update(ctx context.Context, ev *event.Event) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.WriteTimeout)
 	defer cancel()
 
@@ -81,12 +80,12 @@ func (p *Postgres) Update(event *event.Event, ctx context.Context) error {
 	_, err := p.db.Exec(
 		ctxWithTimeout,
 		query,
-		event.Date,
-		event.Name,
-		event.Text,
-		event.Reminder,
-		event.EventId,
-		event.UserID,
+		ev.Date,
+		ev.Name,
+		ev.Text,
+		ev.Reminder,
+		ev.EventID,
+		ev.UserID,
 	)
 
 	if err != nil {
@@ -95,7 +94,7 @@ func (p *Postgres) Update(event *event.Event, ctx context.Context) error {
 	return nil
 }
 
-func (p *Postgres) Get(eventId, userId uuid.UUID, ctx context.Context) (*event.Event, error) {
+func (p *Postgres) Get(ctx context.Context, eventID, userID uuid.UUID) (*event.Event, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.ReadTimeout)
 	defer cancel()
 
@@ -110,11 +109,11 @@ func (p *Postgres) Get(eventId, userId uuid.UUID, ctx context.Context) (*event.E
 	err := p.db.QueryRow(
 		ctxWithTimeout,
 		query,
-		eventId,
-		userId,
+		eventID,
+		userID,
 		event.StatusActive,
 	).Scan(
-		&evt.EventId,
+		&evt.EventID,
 		&evt.UserID,
 		&evt.Date,
 		&evt.Name,
@@ -134,14 +133,12 @@ func (p *Postgres) Get(eventId, userId uuid.UUID, ctx context.Context) (*event.E
 
 	evt.Date = evt.Date.UTC()
 	return &evt, nil
-
 }
 
-func (p *Postgres) LoadDay(userID uuid.UUID, date time.Time, ctx context.Context) ([]*event.Event, error) {
+func (p *Postgres) LoadDay(ctx context.Context, userID uuid.UUID, date time.Time) ([]*event.Event, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.ReadTimeout)
 	defer cancel()
 
-	// Приводим дату к началу дня в UTC
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	endOfDay := startOfDay.AddDate(0, 0, 1)
 
@@ -172,7 +169,7 @@ func (p *Postgres) LoadDay(userID uuid.UUID, date time.Time, ctx context.Context
 	for rows.Next() {
 		var evt event.Event
 		err := rows.Scan(
-			&evt.EventId,
+			&evt.EventID,
 			&evt.UserID,
 			&evt.Date,
 			&evt.Name,
@@ -193,14 +190,12 @@ func (p *Postgres) LoadDay(userID uuid.UUID, date time.Time, ctx context.Context
 	return result, nil
 }
 
-func (p *Postgres) LoadWeek(userID uuid.UUID, date time.Time, ctx context.Context) ([]*event.Event, error) {
+func (p *Postgres) LoadWeek(ctx context.Context, userID uuid.UUID, date time.Time) ([]*event.Event, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.ReadTimeout)
 	defer cancel()
 
-	// Приводим дату к полуночи
 	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 
-	// Определяем начало недели (понедельник)
 	weekday := int(date.Weekday())
 	if weekday == 0 { // Sunday
 		weekday = 7
@@ -235,7 +230,7 @@ func (p *Postgres) LoadWeek(userID uuid.UUID, date time.Time, ctx context.Contex
 	for rows.Next() {
 		var e event.Event
 		if err := rows.Scan(
-			&e.EventId,
+			&e.EventID,
 			&e.UserID,
 			&e.Date,
 			&e.Name,
@@ -256,11 +251,10 @@ func (p *Postgres) LoadWeek(userID uuid.UUID, date time.Time, ctx context.Contex
 	return events, nil
 }
 
-func (p *Postgres) LoadMonth(userID uuid.UUID, date time.Time, ctx context.Context) ([]*event.Event, error) {
+func (p *Postgres) LoadMonth(ctx context.Context, userID uuid.UUID, date time.Time) ([]*event.Event, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.ReadTimeout)
 	defer cancel()
 
-	// Начало месяца
 	startOfMonth := time.Date(
 		date.Year(),
 		date.Month(),
@@ -269,7 +263,6 @@ func (p *Postgres) LoadMonth(userID uuid.UUID, date time.Time, ctx context.Conte
 		date.Location(),
 	)
 
-	// Начало следующего месяца
 	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	query := `
@@ -300,7 +293,7 @@ func (p *Postgres) LoadMonth(userID uuid.UUID, date time.Time, ctx context.Conte
 	for rows.Next() {
 		var e event.Event
 		if err := rows.Scan(
-			&e.EventId,
+			&e.EventID,
 			&e.UserID,
 			&e.Date,
 			&e.Name,
@@ -347,8 +340,8 @@ func (p *Postgres) CleanEvents(ctx context.Context, beforeDate time.Time) (int, 
 	return int(rowsAffected), nil
 }
 
-// MarkReminderSent отмечает уведомление как отправленное
-func (p *Postgres) MarkReminderSent(eventID string, ctx context.Context) error {
+// MarkReminderSent marks a reminder notification as sent.
+func (p *Postgres) MarkReminderSent(ctx context.Context, eventID string) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.WriteTimeout)
 	defer cancel()
 
@@ -362,8 +355,8 @@ func (p *Postgres) MarkReminderSent(eventID string, ctx context.Context) error {
 	return nil
 }
 
-// LoadPendingReminders загружает все активные события с напоминаниями в будущем
-// Используется для прогрева sender service при перезапуске
+// LoadPendingReminders loads all active events with future reminders.
+// Used to warm up the sender service on restart.
 func (p *Postgres) LoadPendingReminders(ctx context.Context) ([]*event.Event, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, p.cfg.DB.Postgres.LongTimeout)
 	defer cancel()
@@ -393,7 +386,7 @@ func (p *Postgres) LoadPendingReminders(ctx context.Context) ([]*event.Event, er
 	for rows.Next() {
 		var e event.Event
 		if err := rows.Scan(
-			&e.EventId,
+			&e.EventID,
 			&e.UserID,
 			&e.Date,
 			&e.Name,

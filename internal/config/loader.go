@@ -9,13 +9,13 @@ import (
 )
 
 func NewAppConfig() (*App, error) {
-	_ = godotenv.Load(".env") // 1️⃣ сначала env
+	_ = godotenv.Load(".env") // load .env first
 
 	cfg := viper.New()
 
 	//cfg.SetEnvPrefix("CALENDAR")
 	cfg.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	cfg.AutomaticEnv() // 2️⃣ потом automatic env
+	cfg.AutomaticEnv() // then automatic env
 
 	cfg.SetConfigName("local")
 	cfg.AddConfigPath("./config")

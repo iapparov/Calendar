@@ -55,7 +55,7 @@ func (s *Service) Log(level zapcore.Level, msg string, fields ...zap.Field) {
 	case s.msgChan <- LogEvent{Level: level, Msg: msg, Fields: fields}:
 		// ок
 	default:
-		// канал переполнен — не блокируем HTTP
+		// channel is full — don't block HTTP
 		log.Println("async logger channel is full, dropping log")
 	}
 }

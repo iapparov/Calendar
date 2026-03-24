@@ -32,9 +32,5 @@ func (s *EmailChannel) Send(email string, eventName string, eventText string, ev
 		eventDate.Format(time.RFC1123),
 	))
 
-	err := smtp.SendMail(s.address, s.auth, s.smtpEmail, to, msg)
-	if err != nil {
-		return err
-	}
-	return nil
+	return smtp.SendMail(s.address, s.auth, s.smtpEmail, to, msg)
 }

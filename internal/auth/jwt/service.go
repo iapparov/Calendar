@@ -13,16 +13,16 @@ import (
 type Service struct {
 	accessSecret    string
 	refreshSecret   string
-	ExpAccessToken  int // в минутах
-	ExpRefreshToken int // в часах
+	expAccessToken  int // in minutes
+	expRefreshToken int // in minutes
 }
 
 func NewService(cfg *config.App) *Service {
 	return &Service{
 		accessSecret:    cfg.Jwt.AccessSecret,
 		refreshSecret:   cfg.Jwt.RefreshSecret,
-		ExpAccessToken:  cfg.Jwt.ExpAccessToken,
-		ExpRefreshToken: cfg.Jwt.ExpRefreshToken,
+		expAccessToken:  cfg.Jwt.ExpAccessToken,
+		expRefreshToken: cfg.Jwt.ExpRefreshToken,
 	}
 }
 
@@ -66,15 +66,15 @@ func (s *Service) RefreshTokens(refreshToken string) (*AuthTokens, error) {
 		return nil, errors.New("invalid refresh token payload")
 	}
 
-	u := &user.User{Id: uuid.MustParse(uuidStr)}
+	u := &user.User{ID: uuid.MustParse(uuidStr)}
 
 	return s.GenerateTokens(u)
 }
 
 func (s *Service) generateAccessToken(u *user.User) (string, error) {
 	claims := jwt.MapClaims{
-		"uuid": u.Id.String(),
-		"exp":  time.Now().Add(time.Minute * time.Duration(s.ExpAccessToken)).Unix(),
+		"uuid": u.ID.String(),
+		"exp":  time.Now().Add(time.Minute * time.Duration(s.expAccessToken)).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.accessSecret))
@@ -82,8 +82,8 @@ func (s *Service) generateAccessToken(u *user.User) (string, error) {
 
 func (s *Service) generateRefreshToken(u *user.User) (string, error) {
 	claims := jwt.MapClaims{
-		"uuid": u.Id.String(),
-		"exp":  time.Now().Add(time.Hour * time.Duration(s.ExpRefreshToken)).Unix(),
+		"uuid": u.ID.String(),
+		"exp":  time.Now().Add(time.Minute * time.Duration(s.expRefreshToken)).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.refreshSecret))

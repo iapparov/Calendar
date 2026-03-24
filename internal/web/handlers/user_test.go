@@ -22,7 +22,7 @@ func TestNewUserHandler(t *testing.T) {
 	if handler == nil {
 		t.Fatal("handler should not be nil")
 	}
-	if handler.Service == nil {
+	if handler.service == nil {
 		t.Error("service should not be nil")
 	}
 }
@@ -34,7 +34,7 @@ func TestLogin_Success(t *testing.T) {
 	}
 
 	mock := &mockAuthService{
-		loginFunc: func(login, password string, ctx context.Context) (*jwt.AuthTokens, error) {
+		loginFunc: func(ctx context.Context, login, password string) (*jwt.AuthTokens, error) {
 			return expectedTokens, nil
 		},
 	}
@@ -70,7 +70,7 @@ func TestLogin_Success(t *testing.T) {
 
 func TestLogin_InvalidCredentials(t *testing.T) {
 	mock := &mockAuthService{
-		loginFunc: func(login, password string, ctx context.Context) (*jwt.AuthTokens, error) {
+		loginFunc: func(ctx context.Context, login, password string) (*jwt.AuthTokens, error) {
 			return nil, errors.New("invalid credentials")
 		},
 	}
@@ -111,14 +111,14 @@ func TestLogin_InvalidJSON(t *testing.T) {
 
 func TestRegister_Success(t *testing.T) {
 	expectedUser := &user.User{
-		Id:       uuid.New(),
+		ID:       uuid.New(),
 		Login:    "newuser",
 		Email:    "new@example.com",
 		Telegram: "123456789",
 	}
 
 	mock := &mockAuthService{
-		registerFunc: func(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
+		registerFunc: func(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
 			return expectedUser, nil
 		},
 	}
@@ -151,7 +151,7 @@ func TestRegister_Success(t *testing.T) {
 
 func TestRegister_ValidationError(t *testing.T) {
 	mock := &mockAuthService{
-		registerFunc: func(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
+		registerFunc: func(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
 			return nil, domain.ErrInvalidLogin
 		},
 	}
@@ -174,7 +174,7 @@ func TestRegister_ValidationError(t *testing.T) {
 
 func TestRegister_UserAlreadyExists(t *testing.T) {
 	mock := &mockAuthService{
-		registerFunc: func(login, password, email, telegram string, ctx context.Context) (*user.User, error) {
+		registerFunc: func(ctx context.Context, login, password, email, telegram string) (*user.User, error) {
 			return nil, domain.ErrUserAlreadyExists
 		},
 	}

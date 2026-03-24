@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Status represents the lifecycle state of an event.
 type Status string
 
 const (
@@ -15,8 +16,9 @@ const (
 	StatusArchive Status = "archive"
 )
 
+// Event represents a calendar event with its metadata.
 type Event struct {
-	EventId      uuid.UUID `json:"event_id"`
+	EventID      uuid.UUID `json:"event_id"`
 	UserID       uuid.UUID `json:"user_id"`
 	Date         time.Time `json:"date"`
 	Name         string    `json:"event_name"`
@@ -26,19 +28,20 @@ type Event struct {
 	ReminderSent bool      `json:"reminder_sent"`
 }
 
+// NewEvent creates a new Event, parsing and validating the date and reminder strings.
 func NewEvent(date string, userID string, eventName string, eventText string, status Status, reminder string) (*Event, error) {
 	t, err := time.ParseInLocation("2006-01-02", date, time.Local)
 	if err != nil {
 		return nil, errors.Join(domain.ErrInvalidInput, err)
 	}
-	// Нормализуем дату к началу дня в UTC (только дата без времени)
+	// Normalize date to the start of the day in UTC (date only, no time)
 	dateOnly := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 
 	reminderTime, err := time.ParseInLocation("2006-01-02T15:04", reminder, time.Local)
 	if err != nil {
 		return nil, errors.Join(domain.ErrInvalidInput, err)
 	}
-	// Конвертируем reminder в UTC для единообразного хранения
+	// Convert reminder to UTC for consistent storage
 	reminderUTC := reminderTime.UTC()
 
 	uid, err := uuid.Parse(userID)
@@ -46,7 +49,7 @@ func NewEvent(date string, userID string, eventName string, eventText string, st
 		return nil, errors.Join(domain.ErrInvalidInput, err)
 	}
 	return &Event{
-		EventId:  uuid.New(),
+		EventID:  uuid.New(),
 		UserID:   uid,
 		Date:     dateOnly,
 		Name:     eventName,
@@ -61,14 +64,14 @@ func (e *Event) Update(date string, eventText string, eventName string, reminder
 	if err != nil {
 		return errors.Join(domain.ErrInvalidInput, err)
 	}
-	// Нормализуем дату к началу дня в UTC (только дата без времени)
+	// Normalize date to the start of the day in UTC (date only, no time)
 	dateOnly := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 
 	r, err := time.ParseInLocation("2006-01-02T15:04", reminder, time.Local)
 	if err != nil {
 		return errors.Join(domain.ErrInvalidInput, err)
 	}
-	// Конвертируем reminder в UTC для единообразного хранения
+	// Convert reminder to UTC for consistent storage
 	reminderUTC := r.UTC()
 
 	e.Date = dateOnly

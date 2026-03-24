@@ -22,7 +22,7 @@ func TestNewEvent_Success(t *testing.T) {
 	if ev == nil {
 		t.Fatal("event is nil")
 	}
-	if ev.EventId == uuid.Nil {
+	if ev.EventID == uuid.Nil {
 		t.Error("event ID should not be nil")
 	}
 	if ev.UserID != userID {
