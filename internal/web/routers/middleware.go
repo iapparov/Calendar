@@ -36,26 +36,27 @@ func AuthMiddleware(auth handlers.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authorization header missing"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errAuthMissing)
 			return
 		}
 
-		const bearer = "bearer "
+		// Case-insensitive "Bearer " prefix check without allocating a lowered copy.
+		const bearer = "Bearer "
 		if len(authHeader) < len(bearer) ||
-			strings.ToLower(authHeader[:len(bearer)]) != bearer {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization scheme"})
+			!strings.EqualFold(authHeader[:len(bearer)], bearer) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errAuthScheme)
 			return
 		}
 
 		token := strings.TrimSpace(authHeader[len(bearer):])
 		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token is empty"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errTokenEmpty)
 			return
 		}
 
 		payload, err := auth.ValidateTokens(token)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, errTokenInvalid)
 			return
 		}
 

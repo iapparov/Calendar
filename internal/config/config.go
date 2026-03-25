@@ -16,6 +16,7 @@ type App struct {
 	PasswordValidation PasswordValidation `mapstructure:"password_validation"`
 	EventValidation    EventValidation    `mapstructure:"event_validation"`
 	Cleaner            Cleaner            `mapstructure:"cleaner"`
+	Debug              Debug              `mapstructure:"debug"`
 }
 
 type Gin struct {
@@ -95,4 +96,9 @@ type EventValidation struct {
 type Cleaner struct {
 	CheckInterval time.Duration `mapstructure:"check_interval"`
 	EventLifetime time.Duration `mapstructure:"event_lifetime"`
+}
+
+type Debug struct {
+	Pprof   bool `mapstructure:"pprof"`
+	Healthz bool `mapstructure:"healthz"`
 }

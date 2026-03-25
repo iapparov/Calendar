@@ -241,7 +241,7 @@ func TestService_Run_AllLevels(t *testing.T) {
 	}
 
 	for _, level := range levels {
-		service.msgChan <- LogEvent{Level: level, Msg: "test", Fields: nil}
+		service.msgChan <- &LogEvent{Level: level, Msg: "test", Fields: nil}
 	}
 
 	// Give time for processing

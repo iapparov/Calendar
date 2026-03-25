@@ -52,3 +52,7 @@ event_validation:
 cleaner:
   check_interval: 30m
   event_lifetime: 1440m
+
+debug:
+  pprof: true
+  healthz: true

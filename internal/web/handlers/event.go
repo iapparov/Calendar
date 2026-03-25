@@ -12,7 +12,11 @@ import (
 )
 
 type CalendarHandler struct {
-	service EventService
+	service      EventService
+	dayHandler   gin.HandlerFunc
+	weekHandler  gin.HandlerFunc
+	monthHandler gin.HandlerFunc
+	emptyEvents  []*event.Event
 }
 
 type EventService interface {
@@ -25,9 +29,16 @@ type EventService interface {
 }
 
 func NewCalendarHandler(service EventService) *CalendarHandler {
-	return &CalendarHandler{
+	h := &CalendarHandler{
 		service: service,
 	}
+	// Pre-build closures once — avoid creating a new closure per request.
+	h.dayHandler = h.buildEventsHandler(service.LoadDay)
+	h.weekHandler = h.buildEventsHandler(service.LoadWeek)
+	h.monthHandler = h.buildEventsHandler(service.LoadMonth)
+	// emptyEvents is a pre-allocated empty slice to avoid allocation when there are no events.
+	h.emptyEvents = make([]*event.Event, 0)
+	return h
 }
 
 // @Summary Create event
@@ -45,21 +56,21 @@ func NewCalendarHandler(service EventService) *CalendarHandler {
 func (h *CalendarHandler) CreateEvent(ctx *gin.Context) {
 	var er dto.EventRequestCreate
 	if err := ctx.ShouldBindJSON(&er); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
-	userId, exist := ctx.Get(CtxUserID)
+	userID, exist := ctx.Get(CtxUserID)
 	if !exist {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found in context"})
+		ctx.JSON(http.StatusBadRequest, errUserIDNotFound)
 		return
 	}
-	evt, err := h.service.Save(ctx.Request.Context(), userId.(string), er.Date, er.EventName, er.EventText, er.ReminderTime)
+	evt, err := h.service.Save(ctx.Request.Context(), userID.(string), er.Date, er.EventName, er.EventText, er.ReminderTime)
 	if err != nil {
 		if isValidationError(err) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, &errorResponse{Error: err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusCreated, evt)
@@ -81,25 +92,25 @@ func (h *CalendarHandler) CreateEvent(ctx *gin.Context) {
 func (h *CalendarHandler) UpdateEvent(ctx *gin.Context) {
 	var er dto.EventRequestUpdate
 	if err := ctx.ShouldBindJSON(&er); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
-	userId, exist := ctx.Get(CtxUserID)
+	userID, exist := ctx.Get(CtxUserID)
 	if !exist {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found in context"})
+		ctx.JSON(http.StatusBadRequest, errUserIDNotFound)
 		return
 	}
-	evt, err := h.service.Update(ctx.Request.Context(), er.EventID, userId.(string), er.Date, er.EventText, er.EventName, er.ReminderTime)
+	evt, err := h.service.Update(ctx.Request.Context(), er.EventID, userID.(string), er.Date, er.EventText, er.EventName, er.ReminderTime)
 	if err != nil {
 		if isValidationError(err) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 			return
 		}
 		if isNotFound(err) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusNotFound, &errorResponse{Error: err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, &errorResponse{Error: err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusOK, evt)
@@ -121,30 +132,30 @@ func (h *CalendarHandler) UpdateEvent(ctx *gin.Context) {
 func (h *CalendarHandler) DeleteEvent(ctx *gin.Context) {
 	var evt dto.EventRequestDelete
 	if err := ctx.ShouldBindJSON(&evt); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
 
-	userId, exist := ctx.Get(CtxUserID)
+	userID, exist := ctx.Get(CtxUserID)
 	if !exist {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found in context"})
+		ctx.JSON(http.StatusBadRequest, errUserIDNotFound)
 		return
 	}
 
-	if err := h.service.Delete(ctx.Request.Context(), evt.EventID, userId.(string)); err != nil {
+	if err := h.service.Delete(ctx.Request.Context(), evt.EventID, userID.(string)); err != nil {
 		if isValidationError(err) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 			return
 		}
 		if isNotFound(err) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusNotFound, &errorResponse{Error: err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, &errorResponse{Error: err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusNoContent, nil)
+	ctx.Status(http.StatusNoContent)
 
 }
 
@@ -160,7 +171,7 @@ func (h *CalendarHandler) DeleteEvent(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string{} "Error message"
 // @Router /api/v1/events/day [get]
 func (h *CalendarHandler) EventsForDay(ctx *gin.Context) {
-	h.eventsHandler(h.service.LoadDay)(ctx)
+	h.dayHandler(ctx)
 }
 
 // @Summary Get events for a week
@@ -175,7 +186,7 @@ func (h *CalendarHandler) EventsForDay(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string{} "Error message"
 // @Router /api/v1/events/week [get]
 func (h *CalendarHandler) EventsForWeek(ctx *gin.Context) {
-	h.eventsHandler(h.service.LoadWeek)(ctx)
+	h.weekHandler(ctx)
 }
 
 // @Summary Get events for a month
@@ -190,31 +201,31 @@ func (h *CalendarHandler) EventsForWeek(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string{} "Error message"
 // @Router /api/v1/events/month [get]
 func (h *CalendarHandler) EventsForMonth(ctx *gin.Context) {
-	h.eventsHandler(h.service.LoadMonth)(ctx)
+	h.monthHandler(ctx)
 }
 
-func (h *CalendarHandler) eventsHandler(loadFunc func(ctx context.Context, userID string, date string) ([]*event.Event, error)) gin.HandlerFunc {
+func (h *CalendarHandler) buildEventsHandler(loadFunc func(ctx context.Context, userID string, date string) ([]*event.Event, error)) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		userId, exist := ctx.Get(CtxUserID)
+		userID, exist := ctx.Get(CtxUserID)
 		if !exist {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found in context"})
+			ctx.JSON(http.StatusBadRequest, errUserIDNotFound)
 			return
 		}
 
 		date := ctx.Query("date")
 		if date == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "date query parameter is required"})
+			ctx.JSON(http.StatusBadRequest, errDateRequired)
 			return
 		}
 
-		events, err := loadFunc(ctx.Request.Context(), userId.(string), date)
+		events, err := loadFunc(ctx.Request.Context(), userID.(string), date)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusInternalServerError, &errorResponse{Error: err.Error()})
 			return
 		}
 
 		if events == nil {
-			events = make([]*event.Event, 0)
+			events = h.emptyEvents
 		}
 
 		ctx.JSON(http.StatusOK, events)

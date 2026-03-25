@@ -6,6 +6,7 @@ import (
 	"calendar/internal/pkg/cleaner"
 	"calendar/internal/pkg/notifications/sender"
 	"calendar/internal/repository/postgres"
+	"calendar/internal/web/debug"
 	"calendar/internal/web/handlers"
 	"calendar/internal/web/routers"
 	"context"
@@ -26,6 +27,16 @@ func StartHttpServer(lc fx.Lifecycle, calendarHandler *handlers.CalendarHandler,
 	router := gin.New()
 
 	routers.RegisterRoutes(router, calendarHandler, userHandler, logger)
+
+	// Debug / profiling endpoints
+	if config.Debug.Pprof {
+		debug.RegisterPprof(router)
+		logger.Log(zapcore.InfoLevel, "pprof endpoints enabled at /debug/pprof/*")
+	}
+	if config.Debug.Healthz {
+		debug.RegisterHealthz(router)
+		logger.Log(zapcore.InfoLevel, "healthz endpoint enabled at /healthz")
+	}
 
 	address := fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)
 	server := &http.Server{

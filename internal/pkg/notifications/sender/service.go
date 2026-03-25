@@ -62,7 +62,7 @@ func (s *Service) warmUp(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			s.logger.Log(zapcore.WarnLevel, "warmUp: notification channel is full, skipping event",
-				zap.String("event_id", ev.EventID.String()))
+				zap.Stringer("event_id", ev.EventID))
 		}
 	}
 

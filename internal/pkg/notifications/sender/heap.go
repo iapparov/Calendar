@@ -22,6 +22,7 @@ func (h *reminderHeap) Pop() any {
 	old := *h
 	n := len(old)
 	item := old[n-1]
+	old[n-1] = nil // avoid memory leak — let GC collect the event
 	*h = old[:n-1]
 	return item
 }

@@ -12,10 +12,10 @@ import (
 
 func createTestService() *Service {
 	return &Service{
-		accessSecret:    "test-access-secret-key-12345",
-		refreshSecret:   "test-refresh-secret-key-12345",
-		expAccessToken:  15,
-		expRefreshToken: 24,
+		accessSecretBytes:  []byte("test-access-secret-key-12345"),
+		refreshSecretBytes: []byte("test-refresh-secret-key-12345"),
+		expAccessToken:     15,
+		expRefreshToken:    24,
 	}
 }
 
@@ -38,11 +38,11 @@ func TestNewService(t *testing.T) {
 
 	service := NewService(cfg)
 
-	if service.accessSecret != "access-secret" {
-		t.Errorf("expected accessSecret 'access-secret', got '%s'", service.accessSecret)
+	if string(service.accessSecretBytes) != "access-secret" {
+		t.Errorf("expected accessSecretBytes 'access-secret', got '%s'", service.accessSecretBytes)
 	}
-	if service.refreshSecret != "refresh-secret" {
-		t.Errorf("expected refreshSecret 'refresh-secret', got '%s'", service.refreshSecret)
+	if string(service.refreshSecretBytes) != "refresh-secret" {
+		t.Errorf("expected refreshSecretBytes 'refresh-secret', got '%s'", service.refreshSecretBytes)
 	}
 	if service.expAccessToken != 30 {
 		t.Errorf("expected expAccessToken 30, got %d", service.expAccessToken)
@@ -54,9 +54,9 @@ func TestNewService(t *testing.T) {
 
 func TestGenerateTokens_Success(t *testing.T) {
 	service := createTestService()
-	user := createTestUser()
+	u := createTestUser()
 
-	tokens, err := service.GenerateTokens(user)
+	tokens, err := service.GenerateTokens(u)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -77,9 +77,9 @@ func TestGenerateTokens_Success(t *testing.T) {
 
 func TestValidateTokens_Success(t *testing.T) {
 	service := createTestService()
-	user := createTestUser()
+	u := createTestUser()
 
-	tokens, _ := service.GenerateTokens(user)
+	tokens, _ := service.GenerateTokens(u)
 	payload, err := service.ValidateTokens(tokens.AccessToken)
 
 	if err != nil {
@@ -88,8 +88,8 @@ func TestValidateTokens_Success(t *testing.T) {
 	if payload == nil {
 		t.Fatal("payload should not be nil")
 	}
-	if payload.UserID != user.ID.String() {
-		t.Errorf("expected user ID '%s', got '%s'", user.ID.String(), payload.UserID)
+	if payload.UserID != u.ID.String() {
+		t.Errorf("expected user ID '%s', got '%s'", u.ID.String(), payload.UserID)
 	}
 }
 
@@ -106,14 +106,14 @@ func TestValidateTokens_InvalidToken(t *testing.T) {
 func TestValidateTokens_WrongSecret(t *testing.T) {
 	service1 := createTestService()
 	service2 := &Service{
-		accessSecret:    "different-secret",
-		refreshSecret:   "different-secret",
-		expAccessToken:  15,
-		expRefreshToken: 24,
+		accessSecretBytes:  []byte("different-secret"),
+		refreshSecretBytes: []byte("different-secret"),
+		expAccessToken:     15,
+		expRefreshToken:    24,
 	}
 
-	user := createTestUser()
-	tokens, _ := service1.GenerateTokens(user)
+	u := createTestUser()
+	tokens, _ := service1.GenerateTokens(u)
 
 	_, err := service2.ValidateTokens(tokens.AccessToken)
 
@@ -124,14 +124,14 @@ func TestValidateTokens_WrongSecret(t *testing.T) {
 
 func TestValidateTokens_ExpiredToken(t *testing.T) {
 	service := &Service{
-		accessSecret:    "test-secret",
-		refreshSecret:   "test-secret",
-		expAccessToken:  -1, // Already expired
-		expRefreshToken: 24,
+		accessSecretBytes:  []byte("test-secret"),
+		refreshSecretBytes: []byte("test-secret"),
+		expAccessToken:     -1, // Already expired
+		expRefreshToken:    24,
 	}
 
-	user := createTestUser()
-	tokens, _ := service.GenerateTokens(user)
+	u := createTestUser()
+	tokens, _ := service.GenerateTokens(u)
 
 	_, err := service.ValidateTokens(tokens.AccessToken)
 
@@ -142,9 +142,9 @@ func TestValidateTokens_ExpiredToken(t *testing.T) {
 
 func TestRefreshTokens_Success(t *testing.T) {
 	service := createTestService()
-	user := createTestUser()
+	u := createTestUser()
 
-	originalTokens, _ := service.GenerateTokens(user)
+	originalTokens, _ := service.GenerateTokens(u)
 	newTokens, err := service.RefreshTokens(originalTokens.RefreshToken)
 
 	if err != nil {
@@ -173,9 +173,9 @@ func TestRefreshTokens_InvalidToken(t *testing.T) {
 
 func TestRefreshTokens_AccessTokenAsRefresh(t *testing.T) {
 	service := createTestService()
-	user := createTestUser()
+	u := createTestUser()
 
-	tokens, _ := service.GenerateTokens(user)
+	tokens, _ := service.GenerateTokens(u)
 
 	// Try to use access token as refresh token (should fail due to different secret)
 	_, err := service.RefreshTokens(tokens.AccessToken)
@@ -187,11 +187,11 @@ func TestRefreshTokens_AccessTokenAsRefresh(t *testing.T) {
 
 func TestValidateTokens_AlgorithmConfusion(t *testing.T) {
 	service := createTestService()
-	user := createTestUser()
+	u := createTestUser()
 
 	// Create a token with "none" algorithm
 	claims := jwt.MapClaims{
-		"uuid": user.ID.String(),
+		"uuid": u.ID.String(),
 		"exp":  time.Now().Add(time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodNone, claims)

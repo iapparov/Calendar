@@ -20,10 +20,12 @@ import (
 )
 
 type Service struct {
-	repo   StorageService
-	jwt    JwtAuthService
-	cfg    *config.App
-	logger *logger.Service
+	repo        StorageService
+	jwt         JwtAuthService
+	cfg         *config.App
+	logger      *logger.Service
+	loginRegex  *regexp.Regexp
+	emailRegexp *regexp.Regexp
 }
 
 type JwtAuthService interface {
@@ -38,11 +40,19 @@ type StorageService interface {
 }
 
 func NewService(repo StorageService, jwt JwtAuthService, cfg *config.App, logger *logger.Service) *Service {
+	// Pre-compile login validation regexp once.
+	escapedChars := regexp.QuoteMeta(cfg.UserValidation.AllowedCharacters)
+	loginRe := regexp.MustCompile(`^[` + escapedChars + `]+$`)
+	// emailRegexp is compiled once and reused across all validation calls.
+	emailRe := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
 	return &Service{
-		repo:   repo,
-		jwt:    jwt,
-		cfg:    cfg,
-		logger: logger,
+		repo:        repo,
+		jwt:         jwt,
+		cfg:         cfg,
+		logger:      logger,
+		loginRegex:  loginRe,
+		emailRegexp: emailRe,
 	}
 }
 
@@ -141,13 +151,12 @@ func (s *Service) ValidateTokens(tokenStr string) (*jwt.Payload, error) {
 
 func (s *Service) isValidLogin(login string) error {
 	cfg := s.cfg.UserValidation
-	if utf8.RuneCountInString(login) < cfg.MinLength || utf8.RuneCountInString(login) > cfg.MaxLength {
+	l := utf8.RuneCountInString(login)
+	if l < cfg.MinLength || l > cfg.MaxLength {
 		return fmt.Errorf("%w: must be between %d and %d characters", domain.ErrInvalidLogin, cfg.MinLength, cfg.MaxLength)
 	}
 
-	escapedChars := regexp.QuoteMeta(cfg.AllowedCharacters)
-	loginRegexp := regexp.MustCompile(`^[` + escapedChars + `]+$`)
-	if !loginRegexp.MatchString(login) {
+	if !s.loginRegex.MatchString(login) {
 		return fmt.Errorf("%w: must contain only letters, digits, underscores, or hyphens and must not contain spaces", domain.ErrInvalidLogin)
 	}
 	return nil
@@ -180,6 +189,10 @@ func (s *Service) isValidPassword(password string) error {
 		case unicode.IsDigit(r):
 			hasDigit = true
 		}
+		// Early exit: all flags satisfied — no need to scan more runes.
+		if hasUpper && hasLower && hasDigit {
+			break
+		}
 	}
 
 	if cfg.RequireUpper && !hasUpper {
@@ -208,15 +221,11 @@ func (s *Service) isValidTelegramChatId(chatId string) error {
 }
 
 func (s *Service) isValidEmail(email string) error {
-	l := utf8.RuneCountInString(email)
-	if l < 6 { // minimum email: a@b.cc (6 chars)
+	if len(email) < 6 { // fast path: min email a@b.cc is 6 bytes; len() avoids rune scan for ASCII
 		return fmt.Errorf("%w: must be at least 6 characters", domain.ErrInvalidEmail)
 	}
-
-	re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`) // basic email format validation
-	if !re.MatchString(email) {
+	if !s.emailRegexp.MatchString(email) {
 		return fmt.Errorf("%w: invalid email format", domain.ErrInvalidEmail)
 	}
-
 	return nil
 }

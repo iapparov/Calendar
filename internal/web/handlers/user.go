@@ -50,29 +50,28 @@ const (
 func (h *UserHandler) Register(ctx *gin.Context) {
 	var req dto.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
 	usr, err := h.service.Register(ctx.Request.Context(), req.Login, req.Password, req.Email, req.Telegram)
 	if err != nil {
 		if isValidationError(err) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 			return
 		}
 		if isConflict(err) {
-			ctx.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			ctx.JSON(http.StatusConflict, &errorResponse{Error: err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, &errorResponse{Error: err.Error()})
 		return
 	}
-	res := dto.RegisterResponse{
+	ctx.JSON(http.StatusOK, &dto.RegisterResponse{
 		ID:       usr.ID.String(),
 		Login:    usr.Login,
 		Email:    usr.Email,
 		Telegram: usr.Telegram,
-	}
-	ctx.JSON(http.StatusOK, res)
+	})
 }
 
 // @Summary User login
@@ -88,19 +87,18 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 func (h *UserHandler) Login(ctx *gin.Context) {
 	var req dto.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
 	jwtResp, err := h.service.Login(ctx.Request.Context(), req.Login, req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusUnauthorized, &errorResponse{Error: err.Error()})
 		return
 	}
-	res := dto.AuthTokens{
+	ctx.JSON(http.StatusOK, &dto.AuthTokens{
 		AccessToken:  jwtResp.AccessToken,
 		RefreshToken: jwtResp.RefreshToken,
-	}
-	ctx.JSON(http.StatusOK, res)
+	})
 }
 
 // @Summary Refresh tokens
@@ -116,17 +114,16 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 	var req dto.TokenRefreshRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, &errorResponse{Error: err.Error()})
 		return
 	}
 	jwtResp, err := h.service.RefreshTokens(req.RefreshToken)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusUnauthorized, &errorResponse{Error: err.Error()})
 		return
 	}
-	res := dto.AuthTokens{
+	ctx.JSON(http.StatusOK, &dto.AuthTokens{
 		AccessToken:  jwtResp.AccessToken,
 		RefreshToken: jwtResp.RefreshToken,
-	}
-	ctx.JSON(http.StatusOK, res)
+	})
 }

@@ -63,14 +63,14 @@ func (s *Service) Save(ctx context.Context, userID, date, eventName, eventText, 
 		s.logger.Log(zapcore.ErrorLevel, "event save error", zap.Error(err))
 		return nil, err
 	}
-	s.logger.Log(zapcore.DebugLevel, "event saved", zap.String("event_id", evt.EventID.String()))
+	s.logger.Log(zapcore.DebugLevel, "event saved", zap.Stringer("event_id", evt.EventID))
 
 	err = s.notifier.Send(evt)
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "event notification error", zap.Error(err))
 		return nil, err
 	}
-	s.logger.Log(zapcore.DebugLevel, "event notification sent", zap.String("event_id", evt.EventID.String()))
+	s.logger.Log(zapcore.DebugLevel, "event notification sent", zap.Stringer("event_id", evt.EventID))
 
 	return evt, nil
 }
@@ -90,14 +90,14 @@ func (s *Service) Delete(ctx context.Context, eventID, userID string) error {
 
 	err = s.repo.Delete(ctx, eid, uid)
 	if err != nil && errors.Is(err, domain.ErrEventNotFound) {
-		s.logger.Log(zapcore.DebugLevel, "event not found", zap.String("event_id", eid.String()))
+		s.logger.Log(zapcore.DebugLevel, "event not found", zap.Stringer("event_id", eid))
 		return domain.ErrEventNotFound
 	}
 	if err != nil {
 		s.logger.Log(zapcore.ErrorLevel, "event delete error", zap.Error(err))
 		return err
 	}
-	s.logger.Log(zapcore.DebugLevel, "event deleted", zap.String("event_id", eid.String()))
+	s.logger.Log(zapcore.DebugLevel, "event deleted", zap.Stringer("event_id", eid))
 	return nil
 }
 
@@ -122,7 +122,7 @@ func (s *Service) Update(ctx context.Context, eventID, userID, date, eventText, 
 		return nil, err
 	}
 	if err == nil && evt == nil {
-		s.logger.Log(zapcore.DebugLevel, "event not found", zap.String("event_id", eid.String()))
+		s.logger.Log(zapcore.DebugLevel, "event not found", zap.Stringer("event_id", eid))
 		return nil, domain.ErrEventNotFound
 	}
 
@@ -137,7 +137,7 @@ func (s *Service) Update(ctx context.Context, eventID, userID, date, eventText, 
 		return nil, err
 	}
 
-	s.logger.Log(zapcore.DebugLevel, "event updated", zap.String("event_id", eid.String()))
+	s.logger.Log(zapcore.DebugLevel, "event updated", zap.Stringer("event_id", eid))
 	return evt, nil
 }
 
@@ -197,14 +197,17 @@ func (s *Service) parser(userID string, date string) (time.Time, uuid.UUID, erro
 	return d, uid, nil
 }
 
-func (s *Service) eventValidation(name string, description string, date string, reminder string, userid string) error {
-	if utf8.RuneCountInString(name) < s.cfg.EventValidation.NameMinLength || utf8.RuneCountInString(name) > s.cfg.EventValidation.NameMaxLength {
+func (s *Service) eventValidation(name, description, date, reminder, userid string) error {
+	nameLen := utf8.RuneCountInString(name)
+	if nameLen < s.cfg.EventValidation.NameMinLength || nameLen > s.cfg.EventValidation.NameMaxLength {
 		return fmt.Errorf("%w: length must be between %d and %d characters", domain.ErrInvalidEventName, s.cfg.EventValidation.NameMinLength, s.cfg.EventValidation.NameMaxLength)
 	}
-	if s.cfg.EventValidation.DescriptionRequire && utf8.RuneCountInString(description) == 0 {
+
+	descLen := utf8.RuneCountInString(description)
+	if s.cfg.EventValidation.DescriptionRequire && descLen == 0 {
 		return fmt.Errorf("%w: description is required", domain.ErrInvalidEventText)
 	}
-	if utf8.RuneCountInString(description) > s.cfg.EventValidation.DescriptionMaxLength {
+	if descLen > s.cfg.EventValidation.DescriptionMaxLength {
 		return fmt.Errorf("%w: length must not exceed %d characters", domain.ErrInvalidEventText, s.cfg.EventValidation.DescriptionMaxLength)
 	}
 	dateTime, err := time.ParseInLocation("2006-01-02", date, time.Local)
